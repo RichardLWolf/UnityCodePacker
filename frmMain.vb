@@ -200,6 +200,7 @@ Public Class frmMain
         If IsFolderNode(e.Node) Then e.Node.ImageKey = ksIconFolderOpen
     End Sub
 
+
     Private Sub tvwFiles_AfterCollapse(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterCollapse
         If IsFolderNode(e.Node) Then e.Node.ImageKey = ksIconFolderClosed
     End Sub
