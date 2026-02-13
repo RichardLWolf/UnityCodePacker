@@ -36,7 +36,13 @@ Partial Class frmMain
         lblUnityFolder = New ToolStripLabel()
         tvwFiles = New TreeView()
         imlIcons = New ImageList(components)
+        splMain = New SplitContainer()
+        tvwPrefab = New TreeView()
         tspMenu.SuspendLayout()
+        CType(splMain, ComponentModel.ISupportInitialize).BeginInit()
+        splMain.Panel1.SuspendLayout()
+        splMain.Panel2.SuspendLayout()
+        splMain.SuspendLayout()
         SuspendLayout()
         ' 
         ' tspMenu
@@ -140,10 +146,10 @@ Partial Class frmMain
         tvwFiles.Font = New Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         tvwFiles.ImageIndex = 0
         tvwFiles.ImageList = imlIcons
-        tvwFiles.Location = New Point(0, 39)
+        tvwFiles.Location = New Point(0, 0)
         tvwFiles.Name = "tvwFiles"
         tvwFiles.SelectedImageIndex = 0
-        tvwFiles.Size = New Size(896, 411)
+        tvwFiles.Size = New Size(456, 411)
         tvwFiles.TabIndex = 1
         ' 
         ' imlIcons
@@ -155,12 +161,42 @@ Partial Class frmMain
         imlIcons.Images.SetKeyName(1, "folder_open")
         imlIcons.Images.SetKeyName(2, "c_file")
         ' 
+        ' splMain
+        ' 
+        splMain.Dock = DockStyle.Fill
+        splMain.Location = New Point(0, 39)
+        splMain.Name = "splMain"
+        ' 
+        ' splMain.Panel1
+        ' 
+        splMain.Panel1.Controls.Add(tvwFiles)
+        ' 
+        ' splMain.Panel2
+        ' 
+        splMain.Panel2.Controls.Add(tvwPrefab)
+        splMain.Size = New Size(896, 411)
+        splMain.SplitterDistance = 456
+        splMain.TabIndex = 2
+        ' 
+        ' tvwPrefab
+        ' 
+        tvwPrefab.CheckBoxes = True
+        tvwPrefab.Dock = DockStyle.Fill
+        tvwPrefab.Font = New Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        tvwPrefab.ImageIndex = 0
+        tvwPrefab.ImageList = imlIcons
+        tvwPrefab.Location = New Point(0, 0)
+        tvwPrefab.Name = "tvwPrefab"
+        tvwPrefab.SelectedImageIndex = 0
+        tvwPrefab.Size = New Size(436, 411)
+        tvwPrefab.TabIndex = 2
+        ' 
         ' frmMain
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(896, 450)
-        Controls.Add(tvwFiles)
+        Controls.Add(splMain)
         Controls.Add(tspMenu)
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
         Name = "frmMain"
@@ -168,6 +204,10 @@ Partial Class frmMain
         Text = "Unity Code Packer"
         tspMenu.ResumeLayout(False)
         tspMenu.PerformLayout()
+        splMain.Panel1.ResumeLayout(False)
+        splMain.Panel2.ResumeLayout(False)
+        CType(splMain, ComponentModel.ISupportInitialize).EndInit()
+        splMain.ResumeLayout(False)
         ResumeLayout(False)
         PerformLayout()
     End Sub
@@ -184,5 +224,7 @@ Partial Class frmMain
     Friend WithEvents lblUnityFolder As ToolStripLabel
     Friend WithEvents tvwFiles As TreeView
     Friend WithEvents imlIcons As ImageList
+    Friend WithEvents splMain As SplitContainer
+    Friend WithEvents tvwPrefab As TreeView
 
 End Class
