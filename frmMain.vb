@@ -2,6 +2,8 @@
 Option Explicit On
 
 Imports System.IO
+Imports System.IO.Compression
+Imports System.Linq
 Imports System.Security.Cryptography
 Imports System.Text
 Imports Newtonsoft.Json
@@ -11,15 +13,41 @@ Public Class frmMain
     ' --- icons ---
     Private Const ksIconFolderClosed As String = "folder_closed"
     Private Const ksIconFolderOpen As String = "folder_open"
-    Private Const ksIconCsFile As String = "c_file"
-    ' Reuse ksIconCsFile if you don't have a prefab icon in your ImageList
-    Private Const ksIconPrefabFile As String = "prefab_file"
+    Private Const ksIconTextFile As String = "c_file"
 
     ' --- state ---
     Private fsUnityRoot As String = String.Empty
-    Private fsScriptsRoot As String = String.Empty
-    Private fsPrefabsRoot As String = String.Empty
+    Private fsAssetsRoot As String = String.Empty
     Private fbTreeBusy As Boolean = False
+
+    ' Broad set of Unity/project text files that are useful to include in a code pack.
+    ' These are intentionally text-oriented file types only.
+    Private Shared ReadOnly moAllowedExtensions As HashSet(Of String) =
+        New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {
+            ".cs",
+            ".prefab",
+            ".asset",
+            ".unity",
+            ".json",
+            ".asmdef",
+            ".uxml",
+            ".uss",
+            ".shader",
+            ".compute",
+            ".cginc",
+            ".hlsl",
+            ".mat",
+            ".anim",
+            ".controller",
+            ".overridecontroller",
+            ".inputactions",
+            ".spriteatlasv2",
+            ".txt",
+            ".md",
+            ".xml",
+            ".yml",
+            ".yaml"
+        }
 
     ' ---------- Form ----------
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -29,26 +57,28 @@ Public Class frmMain
 
         If Not String.IsNullOrWhiteSpace(psUnity) AndAlso Directory.Exists(psUnity) Then
 
-            fsUnityRoot = psUnity
-            fsScriptsRoot = Path.Combine(fsUnityRoot, "Assets", "Scripts")
-            fsPrefabsRoot = Path.Combine(fsUnityRoot, "Assets", "Prefabs")
+            fsUnityRoot = psUnity.Trim()
+            fsAssetsRoot = Path.Combine(fsUnityRoot, "Assets")
 
-            lblUnityFolder.Text = "Unity Folder: " & fsUnityRoot
-            lblUnityFolder.ToolTipText = Path.Combine(fsUnityRoot, "Assets")
-
-            BuildTrees()
+            If Directory.Exists(fsAssetsRoot) Then
+                lblUnityFolder.Text = "Unity Folder: " & fsUnityRoot
+                lblUnityFolder.ToolTipText = fsAssetsRoot
+                BuildTree()
+            Else
+                fsUnityRoot = String.Empty
+                fsAssetsRoot = String.Empty
+                lblUnityFolder.Text = "Unity Folder:"
+                lblUnityFolder.ToolTipText = String.Empty
+                tvwFiles.Nodes.Clear()
+            End If
 
         Else
             tvwFiles.Nodes.Clear()
-            tvwPrefab.Nodes.Clear()
         End If
 
         If Not String.IsNullOrWhiteSpace(psExport) AndAlso Directory.Exists(psExport) Then
-            txtExportTo.Text = Path.Combine(psExport, "codepack.json")
+            txtExportTo.Text = Path.Combine(psExport, "codepack.zip")
         End If
-
-        splMain.SplitterDistance = Me.ClientRectangle.Width \ 2I
-
     End Sub
 
     ' ---------- Unity folder selection ----------
@@ -62,70 +92,47 @@ Public Class frmMain
         If poDlg.ShowDialog(Me) <> DialogResult.OK Then Exit Sub
 
         fsUnityRoot = poDlg.SelectedPath.Trim()
-        fsScriptsRoot = Path.Combine(fsUnityRoot, "Assets", "Scripts")
-        fsPrefabsRoot = Path.Combine(fsUnityRoot, "Assets", "Prefabs")
+        fsAssetsRoot = Path.Combine(fsUnityRoot, "Assets")
 
-        lblUnityFolder.Text = "Unity Folder: " & fsUnityRoot
-        lblUnityFolder.ToolTipText = Path.Combine(fsUnityRoot, "Assets")
-
-        If Not Directory.Exists(Path.Combine(fsUnityRoot, "Assets")) Then
-            MessageBox.Show(Me, "That folder doesn’t contain an Assets\ folder. Pick the Unity project root.", "Invalid Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            fsUnityRoot = ""
-            fsScriptsRoot = ""
-            fsPrefabsRoot = ""
+        If Not Directory.Exists(fsAssetsRoot) Then
+            MessageBox.Show(Me, "That folder does not contain an Assets\ folder. Pick the Unity project root.", "Invalid Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            fsUnityRoot = String.Empty
+            fsAssetsRoot = String.Empty
+            lblUnityFolder.Text = "Unity Folder:"
+            lblUnityFolder.ToolTipText = String.Empty
             tvwFiles.Nodes.Clear()
-            tvwPrefab.Nodes.Clear()
             Exit Sub
         End If
 
-        ' If Scripts folder missing, fall back to Assets (and still filter to *.cs)
-        If Not Directory.Exists(fsScriptsRoot) Then
-            MessageBox.Show(Me, "Assets\Scripts not found. Creating scripts tree from Assets\ instead.", "Scripts Folder Missing", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            fsScriptsRoot = Path.Combine(fsUnityRoot, "Assets")
-        End If
-
-        ' If Prefabs folder missing, fall back to Assets (and still filter to *.prefab)
-        If Not Directory.Exists(fsPrefabsRoot) Then
-            fsPrefabsRoot = Path.Combine(fsUnityRoot, "Assets")
-        End If
+        lblUnityFolder.Text = "Unity Folder: " & fsUnityRoot
+        lblUnityFolder.ToolTipText = fsAssetsRoot
 
         My.Settings.UnityFolder = fsUnityRoot
         My.Settings.Save()
 
-        BuildTrees()
+        BuildTree()
 
     End Sub
 
-    Private Sub BuildTrees()
+    Private Sub BuildTree()
 
-        ' Scripts tree (*.cs)
-        BuildTreeFor(tvwFiles, fsScriptsRoot, "*.cs", ksIconCsFile)
-
-        ' Prefabs tree (*.prefab)
-        BuildTreeFor(tvwPrefab, fsPrefabsRoot, "*.prefab", ksIconPrefabFile)
-
-    End Sub
-
-    Private Sub BuildTreeFor(oTree As TreeView, sRoot As String, sPattern As String, sFileIconKey As String)
-
-        If String.IsNullOrWhiteSpace(sRoot) OrElse Not Directory.Exists(sRoot) Then
-            oTree.Nodes.Clear()
+        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
+            tvwFiles.Nodes.Clear()
             Exit Sub
         End If
 
-        oTree.BeginUpdate()
-        oTree.Nodes.Clear()
+        tvwFiles.BeginUpdate()
+        tvwFiles.Nodes.Clear()
 
-        Dim poRootNode As TreeNode = CreateFolderNode(sRoot, sPattern, sFileIconKey)
+        Dim poRootNode As TreeNode = CreateFolderNode(fsAssetsRoot)
         poRootNode.Expand()
-        oTree.Nodes.Add(poRootNode)
+        tvwFiles.Nodes.Add(poRootNode)
 
-        oTree.EndUpdate()
+        tvwFiles.EndUpdate()
 
     End Sub
 
-    ' Folders are nodes; only files matching sPattern become leaf nodes (Tag = full file path)
-    Private Function CreateFolderNode(sFolder As String, sPattern As String, sFileIconKey As String) As TreeNode
+    Private Function CreateFolderNode(sFolder As String) As TreeNode
 
         Dim psName As String = Path.GetFileName(sFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
         If String.IsNullOrWhiteSpace(psName) Then psName = sFolder
@@ -135,54 +142,66 @@ Public Class frmMain
         poNode.ImageKey = ksIconFolderClosed
         poNode.SelectedImageKey = ksIconFolderOpen
 
-        ' Add subfolders (recursive)
-        Dim paDirs() As String = {}
+        Dim paDirs() As String = Array.Empty(Of String)()
+
         Try
             paDirs = Directory.GetDirectories(sFolder)
         Catch
-            paDirs = {}
+            paDirs = Array.Empty(Of String)()
         End Try
 
         Array.Sort(paDirs, StringComparer.OrdinalIgnoreCase)
 
         For Each psDir As String In paDirs
-
-            Dim psLower As String = psDir.ToLowerInvariant()
-
-            If psLower.Contains(Path.DirectorySeparatorChar & "library") OrElse
-               psLower.Contains(Path.DirectorySeparatorChar & "temp") OrElse
-               psLower.Contains(Path.DirectorySeparatorChar & "obj") OrElse
-               psLower.Contains(Path.DirectorySeparatorChar & "logs") OrElse
-               psLower.Contains(Path.DirectorySeparatorChar & ".git") OrElse
-               psLower.Contains(Path.DirectorySeparatorChar & "builds") Then
-                Continue For
-            End If
-
-            poNode.Nodes.Add(CreateFolderNode(psDir, sPattern, sFileIconKey))
-
+            If ShouldSkipDirectory(psDir) Then Continue For
+            poNode.Nodes.Add(CreateFolderNode(psDir))
         Next
 
-        ' Add matching files (top-level only)
-        Dim paFiles() As String = {}
+        Dim paFiles() As String = Array.Empty(Of String)()
+
         Try
-            paFiles = Directory.GetFiles(sFolder, sPattern, SearchOption.TopDirectoryOnly)
+            paFiles = Directory.GetFiles(sFolder, "*.*", SearchOption.TopDirectoryOnly)
         Catch
-            paFiles = {}
+            paFiles = Array.Empty(Of String)()
         End Try
 
         Array.Sort(paFiles, StringComparer.OrdinalIgnoreCase)
 
         For Each psFile As String In paFiles
+            If Not IsAllowedFile(psFile) Then Continue For
 
             Dim poFileNode As New TreeNode(Path.GetFileName(psFile))
             poFileNode.Tag = psFile
-            poFileNode.ImageKey = sFileIconKey
-            poFileNode.SelectedImageKey = sFileIconKey
+            poFileNode.ImageKey = ksIconTextFile
+            poFileNode.SelectedImageKey = ksIconTextFile
             poNode.Nodes.Add(poFileNode)
-
         Next
 
         Return poNode
+
+    End Function
+
+    Private Function ShouldSkipDirectory(sFolder As String) As Boolean
+
+        Dim psName As String = Path.GetFileName(sFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+
+        If String.IsNullOrWhiteSpace(psName) Then Return False
+
+        Select Case psName.ToLowerInvariant()
+            Case "library", "temp", "obj", "logs", ".git", "builds", "packagesettings", "userSettings".ToLowerInvariant()
+                Return True
+        End Select
+
+        Return False
+
+    End Function
+
+    Private Function IsAllowedFile(sFilePath As String) As Boolean
+
+        Dim psExt As String = Path.GetExtension(sFilePath)
+        If String.IsNullOrWhiteSpace(psExt) Then Return False
+
+        Return moAllowedExtensions.Contains(psExt)
 
     End Function
 
@@ -195,66 +214,62 @@ Public Class frmMain
         SetAllChecks(False)
     End Sub
 
-    ' Applies to BOTH trees (scripts + prefabs)
     Private Sub SetAllChecks(bChecked As Boolean)
 
         fbTreeBusy = True
 
-        SetAllChecksForTree(tvwFiles, bChecked)
-        SetAllChecksForTree(tvwPrefab, bChecked)
+        If tvwFiles.Nodes.Count > 0 Then
+            tvwFiles.BeginUpdate()
+
+            For Each poNode As TreeNode In tvwFiles.Nodes
+                SetNodeCheckedRecursive(poNode, bChecked)
+            Next
+
+            tvwFiles.EndUpdate()
+        End If
 
         fbTreeBusy = False
 
     End Sub
 
-    Private Sub SetAllChecksForTree(oTree As TreeView, bChecked As Boolean)
-
-        If oTree.Nodes.Count = 0 Then Exit Sub
-
-        oTree.BeginUpdate()
-
-        For Each poNode As TreeNode In oTree.Nodes
-            SetNodeCheckedRecursive(poNode, bChecked)
-        Next
-
-        oTree.EndUpdate()
-
-    End Sub
-
     Private Sub SetNodeCheckedRecursive(oNode As TreeNode, bChecked As Boolean)
+
         oNode.Checked = bChecked
+
         For Each poChild As TreeNode In oNode.Nodes
             SetNodeCheckedRecursive(poChild, bChecked)
         Next
+
     End Sub
 
-    ' ---------- TreeView checkbox behavior (both trees) ----------
-    Private Sub tvwFiles_AfterCheck(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterCheck, tvwPrefab.AfterCheck
+    ' ---------- TreeView checkbox behavior ----------
+    Private Sub tvwFiles_AfterCheck(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterCheck
 
         If fbTreeBusy Then Exit Sub
         fbTreeBusy = True
 
-        ' 1) Cascade to children
         For Each poChild As TreeNode In e.Node.Nodes
             SetNodeCheckedRecursive(poChild, e.Node.Checked)
         Next
 
-        ' 2) Bubble up
         UpdateParentsFromChildren(e.Node)
 
         fbTreeBusy = False
 
     End Sub
 
-    Private Sub tvwFiles_AfterExpand(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterExpand, tvwPrefab.AfterExpand
+    Private Sub tvwFiles_AfterExpand(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterExpand
         If IsFolderNode(e.Node) Then e.Node.ImageKey = ksIconFolderOpen
     End Sub
 
-    Private Sub tvwFiles_AfterCollapse(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterCollapse, tvwPrefab.AfterCollapse
+    Private Sub tvwFiles_AfterCollapse(sender As Object, e As TreeViewEventArgs) Handles tvwFiles.AfterCollapse
         If IsFolderNode(e.Node) Then e.Node.ImageKey = ksIconFolderClosed
     End Sub
 
-    Private Sub tvwFiles_NodeMouseClick(sender As Object, e As TreeNodeMouseClickEventArgs) Handles tvwFiles.NodeMouseClick, tvwPrefab.NodeMouseClick
+    Private Sub tvwFiles_NodeMouseClick(sender As Object, e As TreeNodeMouseClickEventArgs) Handles tvwFiles.NodeMouseClick
+
+        If e.Node Is Nothing Then Exit Sub
+
         If e.Node.Nodes.Count > 0 Then
             If e.Node.IsExpanded Then
                 e.Node.Collapse()
@@ -262,12 +277,16 @@ Public Class frmMain
                 e.Node.Expand()
             End If
         End If
+
     End Sub
 
     Private Function IsFolderNode(oNode As TreeNode) As Boolean
+
         Dim psTag As String = TryCast(oNode.Tag, String)
         If String.IsNullOrWhiteSpace(psTag) Then Return False
+
         Return Directory.Exists(psTag)
+
     End Function
 
     Private Sub UpdateParentsFromChildren(oNode As TreeNode)
@@ -296,9 +315,9 @@ Public Class frmMain
     Private Sub btnBrowseExport_Click(sender As Object, e As EventArgs) Handles btnBrowseExport.Click
 
         Dim poDlg As New SaveFileDialog()
-        poDlg.Title = "Export JSON"
-        poDlg.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
-        poDlg.DefaultExt = "json"
+        poDlg.Title = "Export ZIP"
+        poDlg.Filter = "ZIP files (*.zip)|*.zip|All files (*.*)|*.*"
+        poDlg.DefaultExt = "zip"
         poDlg.AddExtension = True
         poDlg.OverwritePrompt = True
 
@@ -329,32 +348,35 @@ Public Class frmMain
             Exit Sub
         End If
 
+        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
+            MessageBox.Show(Me, "Assets folder was not found.", "Missing Assets Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Exit Sub
+        End If
+
         If String.IsNullOrWhiteSpace(txtExportTo.Text) Then
             MessageBox.Show(Me, "Choose an Export To path first.", "Missing Export Path", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Exit Sub
         End If
 
-        Dim poFiles As List(Of String) = GetCheckedFilesFromBothTrees()
+        Dim poFiles As List(Of String) = GetCheckedFiles()
 
         If poFiles.Count = 0 Then
-            MessageBox.Show(Me, "No .cs or .prefab files are checked.", "Nothing To Export", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Me, "No supported files are checked.", "Nothing To Export", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Exit Sub
         End If
 
         Try
 
             Dim poPack As New UnityCsPack()
-            poPack.Format = "UnityCsPack.v1"
+            poPack.Format = "UnityCsPack.v2"
             poPack.UnityRoot = fsUnityRoot
-
-            ' Root now represents Assets (since we pack multiple subtrees)
-            poPack.Root = Path.Combine(fsUnityRoot, "Assets")
+            poPack.Root = fsAssetsRoot
             poPack.CreatedUtc = Date.UtcNow
             poPack.Files = New List(Of UnityCsFileEntry)()
 
             For Each psFile As String In poFiles
 
-                Dim psText As String = File.ReadAllText(psFile, Encoding.UTF8)
+                Dim psText As String = ReadFilePreserveFormatting(psFile)
 
                 Dim poEntry As New UnityCsFileEntry()
                 poEntry.Path = MakeUnityRelativePath(psFile)
@@ -371,12 +393,34 @@ Public Class frmMain
 
             Dim psJson As String = JsonConvert.SerializeObject(poPack, poJsonSettings)
 
-            Dim psOutPath As String = txtExportTo.Text.Trim()
-            Directory.CreateDirectory(Path.GetDirectoryName(psOutPath))
-            File.WriteAllText(psOutPath, psJson, New UTF8Encoding(False))
+            Dim psZipPath As String = txtExportTo.Text.Trim()
 
-            MessageBox.Show(Me, $"Exported {poFiles.Count} file(s).", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            OpenExplorerSelectFile(psOutPath)
+            If Not psZipPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) Then
+                psZipPath &= ".zip"
+            End If
+
+            Dim psOutFolder As String = Path.GetDirectoryName(psZipPath)
+            If String.IsNullOrWhiteSpace(psOutFolder) Then
+                Throw New InvalidOperationException("The export folder is invalid.")
+            End If
+
+            Directory.CreateDirectory(psOutFolder)
+
+            Dim psJsonPath As String = Path.Combine(psOutFolder, "codepack.json")
+
+            If File.Exists(psJsonPath) Then File.Delete(psJsonPath)
+            If File.Exists(psZipPath) Then File.Delete(psZipPath)
+
+            File.WriteAllText(psJsonPath, psJson, New UTF8Encoding(False))
+
+            Using poArchive As ZipArchive = ZipFile.Open(psZipPath, ZipArchiveMode.Create)
+                poArchive.CreateEntryFromFile(psJsonPath, "codepack.json", CompressionLevel.Optimal)
+            End Using
+
+            File.Delete(psJsonPath)
+
+            MessageBox.Show(Me, $"Exported {poFiles.Count} file(s) to ZIP.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            OpenExplorerSelectFile(psZipPath)
 
         Catch ex As Exception
             MessageBox.Show(Me, ex.Message, "Export Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -384,42 +428,34 @@ Public Class frmMain
 
     End Sub
 
-    Private Function GetCheckedFilesFromBothTrees() As List(Of String)
+    Private Function GetCheckedFiles() As List(Of String)
 
         Dim poList As New List(Of String)()
 
-        CollectCheckedFilesByExtension(tvwFiles, ".cs", poList)
-        CollectCheckedFilesByExtension(tvwPrefab, ".prefab", poList)
+        If tvwFiles.Nodes.Count = 0 Then Return poList
 
-        poList = poList.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
-        Return poList
+        For Each poNode As TreeNode In tvwFiles.Nodes
+            CollectCheckedFilesRecursive(poNode, poList)
+        Next
+
+        Return poList.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
 
     End Function
 
-    Private Sub CollectCheckedFilesByExtension(oTree As TreeView, sExt As String, oOut As List(Of String))
-
-        If oTree.Nodes.Count = 0 Then Exit Sub
-
-        For Each poNode As TreeNode In oTree.Nodes
-            CollectCheckedFilesRecursive(poNode, sExt, oOut)
-        Next
-
-    End Sub
-
-    Private Sub CollectCheckedFilesRecursive(oNode As TreeNode, sExt As String, oOut As List(Of String))
+    Private Sub CollectCheckedFilesRecursive(oNode As TreeNode, oOut As List(Of String))
 
         If oNode.Checked AndAlso oNode.Tag IsNot Nothing Then
 
             Dim psTag As String = TryCast(oNode.Tag, String)
 
-            If Not String.IsNullOrWhiteSpace(psTag) AndAlso psTag.EndsWith(sExt, StringComparison.OrdinalIgnoreCase) Then
+            If Not String.IsNullOrWhiteSpace(psTag) AndAlso File.Exists(psTag) AndAlso IsAllowedFile(psTag) Then
                 oOut.Add(psTag)
             End If
 
         End If
 
         For Each poChild As TreeNode In oNode.Nodes
-            CollectCheckedFilesRecursive(poChild, sExt, oOut)
+            CollectCheckedFilesRecursive(poChild, oOut)
         Next
 
     End Sub
@@ -427,10 +463,14 @@ Public Class frmMain
     Private Function MakeUnityRelativePath(sFullPath As String) As String
 
         Dim psFull As String = Path.GetFullPath(sFullPath)
-        Dim psAssets As String = Path.Combine(fsUnityRoot, "Assets")
-        psAssets = Path.GetFullPath(psAssets)
+        Dim psAssets As String = Path.GetFullPath(fsAssetsRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        Dim psAssetsPrefix As String = psAssets & Path.DirectorySeparatorChar
 
-        If psFull.StartsWith(psAssets, StringComparison.OrdinalIgnoreCase) Then
+        If String.Equals(psFull, psAssets, StringComparison.OrdinalIgnoreCase) Then
+            Return "Assets"
+        End If
+
+        If psFull.StartsWith(psAssetsPrefix, StringComparison.OrdinalIgnoreCase) Then
             Dim psRel As String = "Assets" & psFull.Substring(psAssets.Length)
             Return psRel.Replace("\", "/")
         End If
@@ -445,6 +485,16 @@ Public Class frmMain
 
     End Function
 
+    Private Function ReadFilePreserveFormatting(sFilePath As String) As String
+
+        ' This reads the text without altering indentation or line endings.
+        ' StreamReader with detectEncodingFromByteOrderMarks:=True preserves the actual text content as stored.
+        Using poReader As New StreamReader(sFilePath, Encoding.UTF8, True)
+            Return poReader.ReadToEnd()
+        End Using
+
+    End Function
+
     Private Function ComputeSha256Hex(sText As String) As String
 
         Dim pyBytes() As Byte = Encoding.UTF8.GetBytes(sText)
@@ -454,8 +504,8 @@ Public Class frmMain
             Dim pyHash() As Byte = poSha.ComputeHash(pyBytes)
             Dim poSb As New StringBuilder(pyHash.Length * 2)
 
-            For Each byB As Byte In pyHash
-                poSb.Append(byB.ToString("x2"))
+            For Each pyB As Byte In pyHash
+                poSb.Append(pyB.ToString("x2"))
             Next
 
             Return poSb.ToString()
@@ -464,9 +514,10 @@ Public Class frmMain
 
     End Function
 
-    Public Sub OpenExplorerSelectFile(ByVal sTargetPath As String)
+    Public Sub OpenExplorerSelectFile(sTargetPath As String)
 
         If Not File.Exists(sTargetPath) Then Exit Sub
+
         Dim psArgs As String = "/select,""" & sTargetPath & """"
         Process.Start("explorer.exe", psArgs)
 
