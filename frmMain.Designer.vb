@@ -51,7 +51,7 @@ Partial Class frmMain
         tspMenu.Location = New Point(0, 0)
         tspMenu.Name = "tspMenu"
         tspMenu.Padding = New Padding(10, 0, 10, 0)
-        tspMenu.Size = New Size(896, 39)
+        tspMenu.Size = New Size(1008, 39)
         tspMenu.TabIndex = 0
         tspMenu.Text = "ToolStrip1"
         ' 
@@ -132,12 +132,14 @@ Partial Class frmMain
         lblUnityFolder.Alignment = ToolStripItemAlignment.Right
         lblUnityFolder.ForeColor = Color.Blue
         lblUnityFolder.Name = "lblUnityFolder"
+        lblUnityFolder.Overflow = ToolStripItemOverflow.Never
         lblUnityFolder.Size = New Size(105, 36)
         lblUnityFolder.Text = "Select Unity Folder"
         lblUnityFolder.ToolTipText = "Selected Unity folder root."
         ' 
         ' ToolStripSeparator2
         ' 
+        ToolStripSeparator2.Margin = New Padding(0, 0, 5, 0)
         ToolStripSeparator2.Name = "ToolStripSeparator2"
         ToolStripSeparator2.Size = New Size(6, 39)
         ' 
@@ -166,7 +168,7 @@ Partial Class frmMain
         tvwFiles.Location = New Point(0, 39)
         tvwFiles.Name = "tvwFiles"
         tvwFiles.SelectedImageIndex = 0
-        tvwFiles.Size = New Size(896, 411)
+        tvwFiles.Size = New Size(1008, 411)
         tvwFiles.TabIndex = 1
         ' 
         ' imlIcons
@@ -182,7 +184,7 @@ Partial Class frmMain
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(896, 450)
+        ClientSize = New Size(1008, 450)
         Controls.Add(tvwFiles)
         Controls.Add(tspMenu)
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
