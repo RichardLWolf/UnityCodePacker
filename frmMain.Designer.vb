@@ -34,6 +34,9 @@ Partial Class frmMain
         btnExport = New ToolStripButton()
         btnSelectUnity = New ToolStripButton()
         lblUnityFolder = New ToolStripLabel()
+        ToolStripSeparator2 = New ToolStripSeparator()
+        txtSearch = New ToolStripTextBox()
+        btnSearch = New ToolStripButton()
         tvwFiles = New TreeView()
         imlIcons = New ImageList(components)
         tspMenu.SuspendLayout()
@@ -44,7 +47,7 @@ Partial Class frmMain
         tspMenu.BackColor = SystemColors.ControlDark
         tspMenu.GripStyle = ToolStripGripStyle.Hidden
         tspMenu.ImageScalingSize = New Size(32, 32)
-        tspMenu.Items.AddRange(New ToolStripItem() {btnSelectAll, btnSelectNone, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnExport, btnSelectUnity, lblUnityFolder})
+        tspMenu.Items.AddRange(New ToolStripItem() {btnSelectAll, btnSelectNone, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnExport, btnSelectUnity, lblUnityFolder, ToolStripSeparator2, txtSearch, btnSearch})
         tspMenu.Location = New Point(0, 0)
         tspMenu.Name = "tspMenu"
         tspMenu.Padding = New Padding(10, 0, 10, 0)
@@ -133,6 +136,26 @@ Partial Class frmMain
         lblUnityFolder.Text = "Select Unity Folder"
         lblUnityFolder.ToolTipText = "Selected Unity folder root."
         ' 
+        ' ToolStripSeparator2
+        ' 
+        ToolStripSeparator2.Name = "ToolStripSeparator2"
+        ToolStripSeparator2.Size = New Size(6, 39)
+        ' 
+        ' txtSearch
+        ' 
+        txtSearch.Name = "txtSearch"
+        txtSearch.Size = New Size(100, 39)
+        ' 
+        ' btnSearch
+        ' 
+        btnSearch.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnSearch.Image = CType(resources.GetObject("btnSearch.Image"), Image)
+        btnSearch.ImageTransparentColor = Color.Magenta
+        btnSearch.Name = "btnSearch"
+        btnSearch.Size = New Size(36, 36)
+        btnSearch.Text = "Search"
+        btnSearch.ToolTipText = "Search"
+        ' 
         ' tvwFiles
         ' 
         tvwFiles.CheckBoxes = True
@@ -184,5 +207,8 @@ Partial Class frmMain
     Friend WithEvents lblUnityFolder As ToolStripLabel
     Friend WithEvents tvwFiles As TreeView
     Friend WithEvents imlIcons As ImageList
+    Friend WithEvents ToolStripSeparator2 As ToolStripSeparator
+    Friend WithEvents txtSearch As ToolStripTextBox
+    Friend WithEvents btnSearch As ToolStripButton
 
 End Class

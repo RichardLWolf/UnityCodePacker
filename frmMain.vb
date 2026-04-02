@@ -20,6 +20,10 @@ Public Class frmMain
     Private fsAssetsRoot As String = String.Empty
     Private fbTreeBusy As Boolean = False
 
+    ' --- search state ---
+    Private fsLastSearchText As String = String.Empty
+    Private foLastFoundNode As TreeNode = Nothing
+
     ' Broad set of Unity/project text files that are useful to include in a code pack.
     ' These are intentionally text-oriented file types only.
     Private Shared ReadOnly moAllowedExtensions As HashSet(Of String) =
@@ -70,10 +74,12 @@ Public Class frmMain
                 lblUnityFolder.Text = "Unity Folder:"
                 lblUnityFolder.ToolTipText = String.Empty
                 tvwFiles.Nodes.Clear()
+                ResetSearchState()
             End If
 
         Else
             tvwFiles.Nodes.Clear()
+            ResetSearchState()
         End If
 
         If Not String.IsNullOrWhiteSpace(psExport) AndAlso Directory.Exists(psExport) Then
@@ -101,6 +107,7 @@ Public Class frmMain
             lblUnityFolder.Text = "Unity Folder:"
             lblUnityFolder.ToolTipText = String.Empty
             tvwFiles.Nodes.Clear()
+            ResetSearchState()
             Exit Sub
         End If
 
@@ -115,6 +122,8 @@ Public Class frmMain
     End Sub
 
     Private Sub BuildTree()
+
+        ResetSearchState()
 
         If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
             tvwFiles.Nodes.Clear()
@@ -188,7 +197,7 @@ Public Class frmMain
         If String.IsNullOrWhiteSpace(psName) Then Return False
 
         Select Case psName.ToLowerInvariant()
-            Case "library", "temp", "obj", "logs", ".git", "builds", "packagesettings", "userSettings".ToLowerInvariant()
+            Case "library", "temp", "obj", "logs", ".git", "builds", "packagesettings", "usersettings"
                 Return True
         End Select
 
@@ -310,6 +319,208 @@ Public Class frmMain
         End While
 
     End Sub
+
+    ' ---------- Tree search ----------
+    Private Sub btnSearch_Click(sender As Object, e As EventArgs) Handles btnSearch.Click
+
+        Dim psSearch As String = txtSearch.Text.Trim()
+
+        If psSearch = String.Empty Then
+            System.Media.SystemSounds.Beep.Play()
+            txtSearch.Focus()
+            Exit Sub
+        End If
+
+        If tvwFiles.Nodes.Count = 0 Then
+            System.Media.SystemSounds.Beep.Play()
+            Exit Sub
+        End If
+
+        If Not String.Equals(fsLastSearchText, psSearch, StringComparison.OrdinalIgnoreCase) Then
+            fsLastSearchText = psSearch
+            foLastFoundNode = Nothing
+        ElseIf foLastFoundNode IsNot Nothing AndAlso Not IsNodeStillInTree(foLastFoundNode) Then
+            foLastFoundNode = Nothing
+        End If
+
+        Dim poFound As TreeNode = FindNextMatchingNode(psSearch)
+
+        If poFound Is Nothing Then
+            System.Media.SystemSounds.Beep.Play()
+            MessageBox.Show(Me, "No matching node was found.", "Search", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Exit Sub
+        End If
+
+        SelectAndRevealNode(poFound)
+        foLastFoundNode = poFound
+
+    End Sub
+
+    Private Sub txtSearch_TextChanged(sender As Object, e As EventArgs) Handles txtSearch.TextChanged
+        ResetSearchState()
+    End Sub
+
+    Private Sub ResetSearchState()
+
+        fsLastSearchText = String.Empty
+        foLastFoundNode = Nothing
+
+    End Sub
+
+    Private Function FindNextMatchingNode(sSearchText As String) As TreeNode
+
+        Dim poFirstNode As TreeNode = GetFirstTreeNode()
+        If poFirstNode Is Nothing Then Return Nothing
+
+        Dim poCurrent As TreeNode
+
+        If foLastFoundNode Is Nothing Then
+            poCurrent = poFirstNode
+        Else
+            poCurrent = GetNextNodePreOrder(foLastFoundNode)
+
+            If poCurrent Is Nothing Then
+                poCurrent = poFirstNode
+            End If
+        End If
+
+        Dim poStartNode As TreeNode = poCurrent
+
+        Do
+
+            If NodeMatchesSearch(poCurrent, sSearchText) Then
+                Return poCurrent
+            End If
+
+            poCurrent = GetNextNodePreOrder(poCurrent)
+
+            If poCurrent Is Nothing Then
+                poCurrent = poFirstNode
+            End If
+
+        Loop While Not Object.ReferenceEquals(poCurrent, poStartNode)
+
+        Return Nothing
+
+    End Function
+
+    Private Function GetFirstTreeNode() As TreeNode
+
+        If tvwFiles.Nodes.Count = 0 Then Return Nothing
+        Return tvwFiles.Nodes(0)
+
+    End Function
+
+    Private Function GetNextNodePreOrder(oNode As TreeNode) As TreeNode
+
+        If oNode Is Nothing Then Return Nothing
+
+        If oNode.Nodes.Count > 0 Then
+            Return oNode.Nodes(0)
+        End If
+
+        Dim poCurrent As TreeNode = oNode
+
+        While poCurrent IsNot Nothing
+
+            Dim poParent As TreeNode = poCurrent.Parent
+            Dim piIndex As Integer
+
+            If poParent Is Nothing Then
+                piIndex = poCurrent.Index
+
+                If piIndex < tvwFiles.Nodes.Count - 1 Then
+                    Return tvwFiles.Nodes(piIndex + 1)
+                End If
+            Else
+                piIndex = poCurrent.Index
+
+                If piIndex < poParent.Nodes.Count - 1 Then
+                    Return poParent.Nodes(piIndex + 1)
+                End If
+            End If
+
+            poCurrent = poParent
+
+        End While
+
+        Return Nothing
+
+    End Function
+
+    Private Function NodeMatchesSearch(oNode As TreeNode, sSearchText As String) As Boolean
+
+        If oNode Is Nothing Then Return False
+        If String.IsNullOrWhiteSpace(sSearchText) Then Return False
+
+        Dim psNeedle As String = sSearchText.Trim()
+
+        If oNode.Text.IndexOf(psNeedle, StringComparison.OrdinalIgnoreCase) >= 0 Then
+            Return True
+        End If
+
+        Dim psTag As String = TryCast(oNode.Tag, String)
+
+        If Not String.IsNullOrWhiteSpace(psTag) Then
+            If psTag.IndexOf(psNeedle, StringComparison.OrdinalIgnoreCase) >= 0 Then
+                Return True
+            End If
+        End If
+
+        Return False
+
+    End Function
+
+    Private Sub SelectAndRevealNode(oNode As TreeNode)
+
+        If oNode Is Nothing Then Exit Sub
+
+        tvwFiles.BeginUpdate()
+
+        ExpandAncestors(oNode)
+        tvwFiles.SelectedNode = oNode
+        oNode.EnsureVisible()
+
+        tvwFiles.EndUpdate()
+        tvwFiles.Focus()
+
+    End Sub
+
+    Private Sub ExpandAncestors(oNode As TreeNode)
+
+        Dim poStack As New Stack(Of TreeNode)()
+        Dim poCurrent As TreeNode = oNode.Parent
+
+        While poCurrent IsNot Nothing
+            poStack.Push(poCurrent)
+            poCurrent = poCurrent.Parent
+        End While
+
+        While poStack.Count > 0
+            poStack.Pop().Expand()
+        End While
+
+    End Sub
+
+    Private Function IsNodeStillInTree(oNode As TreeNode) As Boolean
+
+        If oNode Is Nothing Then Return False
+
+        Dim poCurrent As TreeNode = oNode
+
+        While poCurrent.Parent IsNot Nothing
+            poCurrent = poCurrent.Parent
+        End While
+
+        For Each poRoot As TreeNode In tvwFiles.Nodes
+            If Object.ReferenceEquals(poRoot, poCurrent) Then
+                Return True
+            End If
+        Next
+
+        Return False
+
+    End Function
 
     ' ---------- Export path browse ----------
     Private Sub btnBrowseExport_Click(sender As Object, e As EventArgs) Handles btnBrowseExport.Click
@@ -538,4 +749,15 @@ Public Class frmMain
         Public Property Text As String
     End Class
 
+    Private Sub txtSearch_KeyDown(sender As Object, e As KeyEventArgs) Handles txtSearch.KeyDown
+        If e.KeyCode = Keys.Enter Then
+            e.Handled = True
+            btnSearch_Click(Nothing, Nothing)
+        End If
+    End Sub
+
+    Private Sub txtSearch_GotFocus(sender As Object, e As EventArgs) Handles txtSearch.GotFocus
+        txtSearch.SelectionStart = 0
+        txtSearch.SelectionLength = txtSearch.Text.Length
+    End Sub
 End Class
