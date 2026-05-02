@@ -25,21 +25,31 @@ Partial Class frmMain
         components = New ComponentModel.Container()
         Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmMain))
         tspMenu = New ToolStrip()
+        btnRefresh = New ToolStripButton()
         btnSelectAll = New ToolStripButton()
         btnSelectNone = New ToolStripButton()
         ToolStripSeparator1 = New ToolStripSeparator()
         ToolStripLabel1 = New ToolStripLabel()
         txtExportTo = New ToolStripTextBox()
         btnBrowseExport = New ToolStripButton()
-        btnExport = New ToolStripButton()
         btnSelectUnity = New ToolStripButton()
         lblUnityFolder = New ToolStripLabel()
+        cboOutput = New ToolStripComboBox()
+        btnExport = New ToolStripButton()
         ToolStripSeparator2 = New ToolStripSeparator()
-        txtSearch = New ToolStripTextBox()
-        btnSearch = New ToolStripButton()
         tvwFiles = New TreeView()
         imlIcons = New ImageList(components)
+        splBase = New SplitContainer()
+        panSearch = New Panel()
+        btnSearch = New Button()
+        txtSearch = New TextBox()
+        lvwSelected = New ListView()
         tspMenu.SuspendLayout()
+        CType(splBase, ComponentModel.ISupportInitialize).BeginInit()
+        splBase.Panel1.SuspendLayout()
+        splBase.Panel2.SuspendLayout()
+        splBase.SuspendLayout()
+        panSearch.SuspendLayout()
         SuspendLayout()
         ' 
         ' tspMenu
@@ -47,13 +57,23 @@ Partial Class frmMain
         tspMenu.BackColor = SystemColors.ControlDark
         tspMenu.GripStyle = ToolStripGripStyle.Hidden
         tspMenu.ImageScalingSize = New Size(32, 32)
-        tspMenu.Items.AddRange(New ToolStripItem() {btnSelectAll, btnSelectNone, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnExport, btnSelectUnity, lblUnityFolder, ToolStripSeparator2, txtSearch, btnSearch})
+        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnExport, ToolStripSeparator2})
         tspMenu.Location = New Point(0, 0)
         tspMenu.Name = "tspMenu"
         tspMenu.Padding = New Padding(10, 0, 10, 0)
         tspMenu.Size = New Size(1008, 39)
         tspMenu.TabIndex = 0
         tspMenu.Text = "ToolStrip1"
+        ' 
+        ' btnRefresh
+        ' 
+        btnRefresh.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnRefresh.Image = CType(resources.GetObject("btnRefresh.Image"), Image)
+        btnRefresh.ImageTransparentColor = Color.Magenta
+        btnRefresh.Name = "btnRefresh"
+        btnRefresh.Size = New Size(36, 36)
+        btnRefresh.Text = "Refresh"
+        btnRefresh.TextImageRelation = TextImageRelation.ImageAboveText
         ' 
         ' btnSelectAll
         ' 
@@ -101,21 +121,13 @@ Partial Class frmMain
         ' 
         btnBrowseExport.DisplayStyle = ToolStripItemDisplayStyle.Image
         btnBrowseExport.Image = CType(resources.GetObject("btnBrowseExport.Image"), Image)
+        btnBrowseExport.ImageAlign = ContentAlignment.MiddleLeft
         btnBrowseExport.ImageTransparentColor = Color.Magenta
         btnBrowseExport.Name = "btnBrowseExport"
-        btnBrowseExport.Size = New Size(36, 36)
+        btnBrowseExport.Padding = New Padding(0, 0, 10, 0)
+        btnBrowseExport.Size = New Size(46, 36)
         btnBrowseExport.Text = "Browse folder"
         btnBrowseExport.TextImageRelation = TextImageRelation.ImageAboveText
-        ' 
-        ' btnExport
-        ' 
-        btnExport.DisplayStyle = ToolStripItemDisplayStyle.Image
-        btnExport.Image = CType(resources.GetObject("btnExport.Image"), Image)
-        btnExport.ImageTransparentColor = Color.Magenta
-        btnExport.Name = "btnExport"
-        btnExport.Size = New Size(36, 36)
-        btnExport.Text = "Export JSON"
-        btnExport.TextImageRelation = TextImageRelation.ImageAboveText
         ' 
         ' btnSelectUnity
         ' 
@@ -130,33 +142,37 @@ Partial Class frmMain
         ' lblUnityFolder
         ' 
         lblUnityFolder.Alignment = ToolStripItemAlignment.Right
+        lblUnityFolder.AutoSize = False
         lblUnityFolder.ForeColor = Color.Blue
         lblUnityFolder.Name = "lblUnityFolder"
         lblUnityFolder.Overflow = ToolStripItemOverflow.Never
-        lblUnityFolder.Size = New Size(105, 36)
+        lblUnityFolder.Size = New Size(250, 36)
         lblUnityFolder.Text = "Select Unity Folder"
+        lblUnityFolder.TextAlign = ContentAlignment.MiddleRight
         lblUnityFolder.ToolTipText = "Selected Unity folder root."
+        ' 
+        ' cboOutput
+        ' 
+        cboOutput.Items.AddRange(New Object() {"ZIP Only", "Zip and JSON Codepack"})
+        cboOutput.Name = "cboOutput"
+        cboOutput.Size = New Size(121, 39)
+        cboOutput.ToolTipText = "Output Options"
+        ' 
+        ' btnExport
+        ' 
+        btnExport.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExport.Image = CType(resources.GetObject("btnExport.Image"), Image)
+        btnExport.ImageTransparentColor = Color.Magenta
+        btnExport.Name = "btnExport"
+        btnExport.Size = New Size(36, 36)
+        btnExport.Text = "Export JSON"
+        btnExport.TextImageRelation = TextImageRelation.ImageAboveText
         ' 
         ' ToolStripSeparator2
         ' 
         ToolStripSeparator2.Margin = New Padding(0, 0, 5, 0)
         ToolStripSeparator2.Name = "ToolStripSeparator2"
         ToolStripSeparator2.Size = New Size(6, 39)
-        ' 
-        ' txtSearch
-        ' 
-        txtSearch.Name = "txtSearch"
-        txtSearch.Size = New Size(100, 39)
-        ' 
-        ' btnSearch
-        ' 
-        btnSearch.DisplayStyle = ToolStripItemDisplayStyle.Image
-        btnSearch.Image = CType(resources.GetObject("btnSearch.Image"), Image)
-        btnSearch.ImageTransparentColor = Color.Magenta
-        btnSearch.Name = "btnSearch"
-        btnSearch.Size = New Size(36, 36)
-        btnSearch.Text = "Search"
-        btnSearch.ToolTipText = "Search"
         ' 
         ' tvwFiles
         ' 
@@ -165,10 +181,10 @@ Partial Class frmMain
         tvwFiles.Font = New Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         tvwFiles.ImageIndex = 0
         tvwFiles.ImageList = imlIcons
-        tvwFiles.Location = New Point(0, 39)
+        tvwFiles.Location = New Point(0, 35)
         tvwFiles.Name = "tvwFiles"
         tvwFiles.SelectedImageIndex = 0
-        tvwFiles.Size = New Size(1008, 411)
+        tvwFiles.Size = New Size(658, 376)
         tvwFiles.TabIndex = 1
         ' 
         ' imlIcons
@@ -180,12 +196,73 @@ Partial Class frmMain
         imlIcons.Images.SetKeyName(1, "folder_open")
         imlIcons.Images.SetKeyName(2, "c_file")
         ' 
+        ' splBase
+        ' 
+        splBase.Dock = DockStyle.Fill
+        splBase.Location = New Point(0, 39)
+        splBase.Name = "splBase"
+        ' 
+        ' splBase.Panel1
+        ' 
+        splBase.Panel1.Controls.Add(tvwFiles)
+        splBase.Panel1.Controls.Add(panSearch)
+        ' 
+        ' splBase.Panel2
+        ' 
+        splBase.Panel2.Controls.Add(lvwSelected)
+        splBase.Size = New Size(1008, 411)
+        splBase.SplitterDistance = 658
+        splBase.TabIndex = 2
+        ' 
+        ' panSearch
+        ' 
+        panSearch.BackColor = SystemColors.ControlDark
+        panSearch.Controls.Add(btnSearch)
+        panSearch.Controls.Add(txtSearch)
+        panSearch.Dock = DockStyle.Top
+        panSearch.Location = New Point(0, 0)
+        panSearch.Name = "panSearch"
+        panSearch.Size = New Size(658, 35)
+        panSearch.TabIndex = 2
+        ' 
+        ' btnSearch
+        ' 
+        btnSearch.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnSearch.FlatStyle = FlatStyle.Popup
+        btnSearch.Image = CType(resources.GetObject("btnSearch.Image"), Image)
+        btnSearch.Location = New Point(623, 2)
+        btnSearch.Name = "btnSearch"
+        btnSearch.Size = New Size(30, 30)
+        btnSearch.TabIndex = 3
+        btnSearch.UseVisualStyleBackColor = True
+        ' 
+        ' txtSearch
+        ' 
+        txtSearch.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        txtSearch.Font = New Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        txtSearch.Location = New Point(3, 3)
+        txtSearch.Name = "txtSearch"
+        txtSearch.Size = New Size(614, 29)
+        txtSearch.TabIndex = 0
+        ' 
+        ' lvwSelected
+        ' 
+        lvwSelected.BackColor = Color.Azure
+        lvwSelected.Dock = DockStyle.Fill
+        lvwSelected.Font = New Font("Segoe UI", 12F)
+        lvwSelected.ForeColor = Color.Black
+        lvwSelected.Location = New Point(0, 0)
+        lvwSelected.Name = "lvwSelected"
+        lvwSelected.Size = New Size(346, 411)
+        lvwSelected.TabIndex = 0
+        lvwSelected.UseCompatibleStateImageBehavior = False
+        ' 
         ' frmMain
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1008, 450)
-        Controls.Add(tvwFiles)
+        Controls.Add(splBase)
         Controls.Add(tspMenu)
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
         Name = "frmMain"
@@ -193,6 +270,12 @@ Partial Class frmMain
         Text = "Unity Code Packer"
         tspMenu.ResumeLayout(False)
         tspMenu.PerformLayout()
+        splBase.Panel1.ResumeLayout(False)
+        splBase.Panel2.ResumeLayout(False)
+        CType(splBase, ComponentModel.ISupportInitialize).EndInit()
+        splBase.ResumeLayout(False)
+        panSearch.ResumeLayout(False)
+        panSearch.PerformLayout()
         ResumeLayout(False)
         PerformLayout()
     End Sub
@@ -204,13 +287,18 @@ Partial Class frmMain
     Friend WithEvents ToolStripLabel1 As ToolStripLabel
     Friend WithEvents txtExportTo As ToolStripTextBox
     Friend WithEvents btnBrowseExport As ToolStripButton
-    Friend WithEvents btnExport As ToolStripButton
+    Friend WithEvents btnRefresh As ToolStripButton
     Friend WithEvents btnSelectUnity As ToolStripButton
     Friend WithEvents lblUnityFolder As ToolStripLabel
     Friend WithEvents tvwFiles As TreeView
     Friend WithEvents imlIcons As ImageList
     Friend WithEvents ToolStripSeparator2 As ToolStripSeparator
-    Friend WithEvents txtSearch As ToolStripTextBox
-    Friend WithEvents btnSearch As ToolStripButton
+    Friend WithEvents splBase As SplitContainer
+    Friend WithEvents panSearch As Panel
+    Friend WithEvents btnSearch As Button
+    Friend WithEvents txtSearch As TextBox
+    Friend WithEvents btnExport As ToolStripButton
+    Friend WithEvents lvwSelected As ListView
+    Friend WithEvents cboOutput As ToolStripComboBox
 
 End Class

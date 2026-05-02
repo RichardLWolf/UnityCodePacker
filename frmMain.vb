@@ -7,8 +7,22 @@ Imports System.Linq
 Imports System.Security.Cryptography
 Imports System.Text
 Imports Newtonsoft.Json
+Imports System.Runtime.InteropServices
+Imports System.Threading
 
 Public Class frmMain
+    Private foSorter As ListviewSorter
+
+    <DllImport("user32.dll")>
+    Private Shared Function SetForegroundWindow(ByVal poHwnd As IntPtr) As Boolean
+    End Function
+
+    <DllImport("user32.dll")>
+    Private Shared Function ShowWindowAsync(ByVal poHwnd As IntPtr, ByVal piCmdShow As Integer) As Boolean
+    End Function
+
+    Private Const miSW_RESTORE As Integer = 9
+
 
     ' --- icons ---
     Private Const ksIconFolderClosed As String = "folder_closed"
@@ -47,6 +61,7 @@ Public Class frmMain
             ".inputactions",
             ".spriteatlasv2",
             ".txt",
+            ".sql",
             ".md",
             ".xml",
             ".yml",
@@ -73,18 +88,66 @@ Public Class frmMain
                 fsAssetsRoot = String.Empty
                 lblUnityFolder.Text = "Unity Folder:"
                 lblUnityFolder.ToolTipText = String.Empty
-                tvwFiles.Nodes.Clear()
-                ResetSearchState()
+                ClearAssetsTreeAndSelectedList()
             End If
 
         Else
-            tvwFiles.Nodes.Clear()
-            ResetSearchState()
+            ClearAssetsTreeAndSelectedList()
         End If
 
         If Not String.IsNullOrWhiteSpace(psExport) AndAlso Directory.Exists(psExport) Then
             txtExportTo.Text = Path.Combine(psExport, "codepack.zip")
         End If
+
+        cboOutput.Items.Clear()
+        cboOutput.Items.Add("ZIP only")
+        cboOutput.Items.Add("JSON and ZIP")
+        cboOutput.SelectedIndex = 0
+
+        ConfigureSelectedListView()
+        SyncSelectedListViewFromTree()
+
+    End Sub
+
+    Private Sub ConfigureSelectedListView()
+
+        With lvwSelected
+            .View = View.Details
+            .MultiSelect = False
+            .FullRowSelect = True
+            .GridLines = True
+            .Items.Clear()
+            .SmallImageList = Nothing
+            .Columns.Clear()
+            .Columns.Add("FILENAME", "Selected Files", Math.Max(120, lvwSelected.ClientSize.Width - 8))
+            foSorter = New ListviewSorter(0, SortOrder.Ascending, True)
+            .ListViewItemSorter = foSorter
+        End With
+
+    End Sub
+
+    Private Sub frmMain_Resize(sender As Object, e As EventArgs) Handles Me.Resize
+        ResizeSelectedListViewColumn()
+    End Sub
+
+    Private Sub lvwSelected_Resize(sender As Object, e As EventArgs) Handles lvwSelected.Resize
+        ResizeSelectedListViewColumn()
+    End Sub
+
+    Private Sub ResizeSelectedListViewColumn()
+
+        If lvwSelected.Columns.Count = 0 Then Exit Sub
+
+        lvwSelected.Columns(0).Width = Math.Max(120, lvwSelected.ClientSize.Width - 8)
+
+    End Sub
+
+    Private Sub ClearAssetsTreeAndSelectedList()
+
+        tvwFiles.Nodes.Clear()
+        lvwSelected.Items.Clear()
+        ResetSearchState()
+
     End Sub
 
     ' ---------- Unity folder selection ----------
@@ -106,8 +169,7 @@ Public Class frmMain
             fsAssetsRoot = String.Empty
             lblUnityFolder.Text = "Unity Folder:"
             lblUnityFolder.ToolTipText = String.Empty
-            tvwFiles.Nodes.Clear()
-            ResetSearchState()
+            ClearAssetsTreeAndSelectedList()
             Exit Sub
         End If
 
@@ -121,23 +183,52 @@ Public Class frmMain
 
     End Sub
 
-    Private Sub BuildTree()
+    Private Sub BuildTree(Optional oCheckedFiles As HashSet(Of String) = Nothing, Optional oExpandedFolders As HashSet(Of String) = Nothing, Optional sSelectedPath As String = "")
 
         ResetSearchState()
 
         If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
-            tvwFiles.Nodes.Clear()
+            ClearAssetsTreeAndSelectedList()
             Exit Sub
         End If
 
+        fbTreeBusy = True
         tvwFiles.BeginUpdate()
-        tvwFiles.Nodes.Clear()
 
-        Dim poRootNode As TreeNode = CreateFolderNode(fsAssetsRoot)
-        poRootNode.Expand()
-        tvwFiles.Nodes.Add(poRootNode)
+        Try
 
-        tvwFiles.EndUpdate()
+            tvwFiles.Nodes.Clear()
+
+            Dim poRootNode As TreeNode = CreateFolderNode(fsAssetsRoot)
+            tvwFiles.Nodes.Add(poRootNode)
+
+            If oCheckedFiles IsNot Nothing AndAlso oCheckedFiles.Count > 0 Then
+                ApplyCheckedFilesToTree(poRootNode, oCheckedFiles)
+                UpdateFolderChecksRecursive(poRootNode)
+            End If
+
+            If oExpandedFolders IsNot Nothing AndAlso oExpandedFolders.Count > 0 Then
+                ApplyExpandedFoldersToTree(poRootNode, oExpandedFolders)
+            Else
+                poRootNode.Expand()
+            End If
+
+            If Not String.IsNullOrWhiteSpace(sSelectedPath) Then
+                Dim poSelectedNode As TreeNode = FindNodeByPath(sSelectedPath)
+
+                If poSelectedNode IsNot Nothing Then
+                    ExpandAncestors(poSelectedNode)
+                    tvwFiles.SelectedNode = poSelectedNode
+                    poSelectedNode.EnsureVisible()
+                End If
+            End If
+
+        Finally
+            tvwFiles.EndUpdate()
+            fbTreeBusy = False
+        End Try
+
+        SyncSelectedListViewFromTree()
 
     End Sub
 
@@ -238,6 +329,7 @@ Public Class frmMain
         End If
 
         fbTreeBusy = False
+        SyncSelectedListViewFromTree()
 
     End Sub
 
@@ -264,6 +356,7 @@ Public Class frmMain
         UpdateParentsFromChildren(e.Node)
 
         fbTreeBusy = False
+        SyncSelectedListViewFromTree()
 
     End Sub
 
@@ -320,6 +413,158 @@ Public Class frmMain
 
     End Sub
 
+    Private Sub SyncSelectedListViewFromTree()
+
+        Dim poCheckedFiles As List(Of String) = GetCheckedFiles()
+
+        poCheckedFiles.Sort(StringComparer.OrdinalIgnoreCase)
+
+        lvwSelected.BeginUpdate()
+
+        Try
+            lvwSelected.Items.Clear()
+
+            For Each psFile As String In poCheckedFiles
+                Dim poItem As New ListViewItem(Path.GetFileName(psFile))
+                poItem.Name = psFile
+                poItem.Tag = psFile
+                poItem.ToolTipText = psFile
+                lvwSelected.Items.Add(poItem)
+            Next
+
+            ResizeSelectedListViewColumn()
+
+        Finally
+            lvwSelected.Sort()
+            lvwSelected.EndUpdate()
+        End Try
+
+    End Sub
+
+    Private Sub ApplyCheckedFilesToTree(oNode As TreeNode, oCheckedFiles As HashSet(Of String))
+
+        If oNode Is Nothing OrElse oCheckedFiles Is Nothing Then Exit Sub
+
+        Dim psTag As String = TryCast(oNode.Tag, String)
+
+        If Not String.IsNullOrWhiteSpace(psTag) AndAlso File.Exists(psTag) AndAlso IsAllowedFile(psTag) Then
+            oNode.Checked = oCheckedFiles.Contains(psTag)
+        End If
+
+        For Each poChild As TreeNode In oNode.Nodes
+            ApplyCheckedFilesToTree(poChild, oCheckedFiles)
+        Next
+
+    End Sub
+
+    Private Function UpdateFolderChecksRecursive(oNode As TreeNode) As Boolean
+
+        If oNode Is Nothing Then Return False
+
+        If Not IsFolderNode(oNode) Then
+            Return oNode.Checked
+        End If
+
+        Dim pbAnyChildChecked As Boolean = False
+
+        For Each poChild As TreeNode In oNode.Nodes
+            If UpdateFolderChecksRecursive(poChild) Then
+                pbAnyChildChecked = True
+            End If
+        Next
+
+        oNode.Checked = pbAnyChildChecked
+        Return pbAnyChildChecked
+
+    End Function
+
+    Private Sub ApplyExpandedFoldersToTree(oNode As TreeNode, oExpandedFolders As HashSet(Of String))
+
+        If oNode Is Nothing OrElse oExpandedFolders Is Nothing Then Exit Sub
+
+        Dim psTag As String = TryCast(oNode.Tag, String)
+
+        If Not String.IsNullOrWhiteSpace(psTag) AndAlso Directory.Exists(psTag) AndAlso oExpandedFolders.Contains(psTag) Then
+            oNode.Expand()
+        End If
+
+        For Each poChild As TreeNode In oNode.Nodes
+            ApplyExpandedFoldersToTree(poChild, oExpandedFolders)
+        Next
+
+    End Sub
+
+    Private Function GetExpandedFolderPaths() As HashSet(Of String)
+
+        Dim poExpandedFolders As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        For Each poNode As TreeNode In tvwFiles.Nodes
+            CollectExpandedFolderPathsRecursive(poNode, poExpandedFolders)
+        Next
+
+        Return poExpandedFolders
+
+    End Function
+
+    Private Sub CollectExpandedFolderPathsRecursive(oNode As TreeNode, oOut As HashSet(Of String))
+
+        If oNode Is Nothing OrElse oOut Is Nothing Then Exit Sub
+
+        Dim psTag As String = TryCast(oNode.Tag, String)
+
+        If oNode.IsExpanded AndAlso Not String.IsNullOrWhiteSpace(psTag) AndAlso Directory.Exists(psTag) Then
+            oOut.Add(psTag)
+        End If
+
+        For Each poChild As TreeNode In oNode.Nodes
+            CollectExpandedFolderPathsRecursive(poChild, oOut)
+        Next
+
+    End Sub
+
+    Private Function GetSelectedNodePath() As String
+
+        If tvwFiles.SelectedNode Is Nothing Then Return String.Empty
+
+        Dim psTag As String = TryCast(tvwFiles.SelectedNode.Tag, String)
+        If String.IsNullOrWhiteSpace(psTag) Then Return String.Empty
+
+        Return psTag
+
+    End Function
+
+    Private Function FindNodeByPath(sPath As String) As TreeNode
+
+        If String.IsNullOrWhiteSpace(sPath) Then Return Nothing
+
+        For Each poNode As TreeNode In tvwFiles.Nodes
+            Dim poFound As TreeNode = FindNodeByPathRecursive(poNode, sPath)
+            If poFound IsNot Nothing Then Return poFound
+        Next
+
+        Return Nothing
+
+    End Function
+
+    Private Function FindNodeByPathRecursive(oNode As TreeNode, sPath As String) As TreeNode
+
+        If oNode Is Nothing Then Return Nothing
+
+        Dim psTag As String = TryCast(oNode.Tag, String)
+
+        If Not String.IsNullOrWhiteSpace(psTag) AndAlso String.Equals(psTag, sPath, StringComparison.OrdinalIgnoreCase) Then
+            Return oNode
+        End If
+
+        For Each poChild As TreeNode In oNode.Nodes
+            Dim poFound As TreeNode = FindNodeByPathRecursive(poChild, sPath)
+            If poFound IsNot Nothing Then Return poFound
+        Next
+
+        Return Nothing
+
+    End Function
+
     ' ---------- Tree search ----------
     Private Sub btnSearch_Click(sender As Object, e As EventArgs) Handles btnSearch.Click
 
@@ -356,9 +601,6 @@ Public Class frmMain
 
     End Sub
 
-    Private Sub txtSearch_TextChanged(sender As Object, e As EventArgs) Handles txtSearch.TextChanged
-        ResetSearchState()
-    End Sub
 
     Private Sub ResetSearchState()
 
@@ -553,7 +795,6 @@ Public Class frmMain
 
     ' ---------- Export ----------
     Private Sub btnExport_Click(sender As Object, e As EventArgs) Handles btnExport.Click
-
         If String.IsNullOrWhiteSpace(fsUnityRoot) OrElse Not Directory.Exists(fsUnityRoot) Then
             MessageBox.Show(Me, "Select a Unity folder first.", "Missing Unity Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Exit Sub
@@ -569,7 +810,8 @@ Public Class frmMain
             Exit Sub
         End If
 
-        Dim poFiles As List(Of String) = GetCheckedFiles()
+        Dim poFiles = GetCheckedFiles()
+        Dim pbKeepJSON As Boolean = CBool(cboOutput.SelectedIndex = 1)
 
         If poFiles.Count = 0 Then
             MessageBox.Show(Me, "No supported files are checked.", "Nothing To Export", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -578,18 +820,18 @@ Public Class frmMain
 
         Try
 
-            Dim poPack As New UnityCsPack()
+            Dim poPack As New UnityCsPack
             poPack.Format = "UnityCsPack.v2"
             poPack.UnityRoot = fsUnityRoot
             poPack.Root = fsAssetsRoot
             poPack.CreatedUtc = Date.UtcNow
-            poPack.Files = New List(Of UnityCsFileEntry)()
+            poPack.Files = New List(Of UnityCsFileEntry)
 
-            For Each psFile As String In poFiles
+            For Each psFile In poFiles
 
-                Dim psText As String = ReadFilePreserveFormatting(psFile)
+                Dim psText = ReadFilePreserveFormatting(psFile)
 
-                Dim poEntry As New UnityCsFileEntry()
+                Dim poEntry As New UnityCsFileEntry
                 poEntry.Path = MakeUnityRelativePath(psFile)
                 poEntry.Sha256 = ComputeSha256Hex(psText)
                 poEntry.Text = psText
@@ -598,37 +840,39 @@ Public Class frmMain
 
             Next
 
-            Dim poJsonSettings As New JsonSerializerSettings()
+            Dim poJsonSettings As New JsonSerializerSettings
             poJsonSettings.Formatting = Formatting.None
             poJsonSettings.NullValueHandling = NullValueHandling.Ignore
 
-            Dim psJson As String = JsonConvert.SerializeObject(poPack, poJsonSettings)
+            Dim psJson = JsonConvert.SerializeObject(poPack, poJsonSettings)
 
-            Dim psZipPath As String = txtExportTo.Text.Trim()
+            Dim psZipPath = txtExportTo.Text.Trim
 
             If Not psZipPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) Then
                 psZipPath &= ".zip"
             End If
 
-            Dim psOutFolder As String = Path.GetDirectoryName(psZipPath)
+            Dim psOutFolder = Path.GetDirectoryName(psZipPath)
             If String.IsNullOrWhiteSpace(psOutFolder) Then
                 Throw New InvalidOperationException("The export folder is invalid.")
             End If
 
             Directory.CreateDirectory(psOutFolder)
 
-            Dim psJsonPath As String = Path.Combine(psOutFolder, "codepack.json")
+            Dim psJsonPath = Path.Combine(psOutFolder, "codepack.json")
 
             If File.Exists(psJsonPath) Then File.Delete(psJsonPath)
             If File.Exists(psZipPath) Then File.Delete(psZipPath)
 
             File.WriteAllText(psJsonPath, psJson, New UTF8Encoding(False))
 
-            Using poArchive As ZipArchive = ZipFile.Open(psZipPath, ZipArchiveMode.Create)
+            Using poArchive = ZipFile.Open(psZipPath, ZipArchiveMode.Create)
                 poArchive.CreateEntryFromFile(psJsonPath, "codepack.json", CompressionLevel.Optimal)
             End Using
 
-            File.Delete(psJsonPath)
+            If Not pbKeepJSON Then
+                File.Delete(psJsonPath)
+            End If
 
             MessageBox.Show(Me, $"Exported {poFiles.Count} file(s) to ZIP.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
             OpenExplorerSelectFile(psZipPath)
@@ -652,6 +896,42 @@ Public Class frmMain
         Return poList.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
 
     End Function
+
+    Private Sub btnRefresh_Click(sender As Object, e As EventArgs) Handles btnRefresh.Click
+
+        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
+            System.Media.SystemSounds.Beep.Play()
+            ClearAssetsTreeAndSelectedList()
+            Exit Sub
+        End If
+
+        Dim poCheckedFiles As New HashSet(Of String)(GetCheckedFiles(), StringComparer.OrdinalIgnoreCase)
+        Dim poExpandedFolders As HashSet(Of String) = GetExpandedFolderPaths()
+        Dim psSelectedPath As String = GetSelectedNodePath()
+
+        BuildTree(poCheckedFiles, poExpandedFolders, psSelectedPath)
+
+    End Sub
+
+    Private Sub txtSearch_KeyPress(sender As Object, e As KeyPressEventArgs) Handles txtSearch.KeyPress
+        If e.KeyChar = ControlChars.Cr Then
+            e.Handled = True
+            btnSearch_Click(Nothing, Nothing)
+        End If
+    End Sub
+
+
+    Private Sub txtSearch_GotFocus(sender As Object, e As EventArgs) Handles txtSearch.GotFocus
+        txtSearch.SelectAll()
+    End Sub
+
+    Private Sub txtSearch_TextChanged(sender As Object, e As EventArgs) Handles txtSearch.TextChanged
+        ResetSearchState()
+    End Sub
+
+
+
+
 
     Private Sub CollectCheckedFilesRecursive(oNode As TreeNode, oOut As List(Of String))
 
@@ -725,13 +1005,59 @@ Public Class frmMain
 
     End Function
 
-    Public Sub OpenExplorerSelectFile(sTargetPath As String)
+    Private Sub OpenExplorerSelectFile(ByVal sFilePath As String)
+        Try
+            If String.IsNullOrWhiteSpace(sFilePath) Then
+                Return
+            End If
 
-        If Not File.Exists(sTargetPath) Then Exit Sub
+            If Not File.Exists(sFilePath) Then
+                MessageBox.Show("File not found:" & Environment.NewLine & sFilePath, "Open File Location", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
 
-        Dim psArgs As String = "/select,""" & sTargetPath & """"
-        Process.Start("explorer.exe", psArgs)
+            Dim psArguments As String = "/select,""" & sFilePath & """"
+            Dim poProcess As Process = Process.Start("explorer.exe", psArguments)
 
+            BringExplorerWindowToFront(poProcess, sFilePath)
+
+        Catch poEx As Exception
+            MessageBox.Show("Unable to open file location:" & Environment.NewLine & poEx.Message, "Open File Location", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub BringExplorerWindowToFront(ByVal oExplorerProcess As Process, ByVal sFilePath As String)
+        Try
+            Thread.Sleep(350)
+
+            If oExplorerProcess IsNot Nothing Then
+                oExplorerProcess.Refresh()
+
+                If oExplorerProcess.MainWindowHandle <> IntPtr.Zero Then
+                    ShowWindowAsync(oExplorerProcess.MainWindowHandle, miSW_RESTORE)
+                    SetForegroundWindow(oExplorerProcess.MainWindowHandle)
+                    Return
+                End If
+            End If
+
+            Dim psDirectory As String = Path.GetDirectoryName(sFilePath)
+
+            For Each poProcess As Process In Process.GetProcessesByName("explorer")
+                Try
+                    If poProcess.MainWindowHandle <> IntPtr.Zero Then
+                        ShowWindowAsync(poProcess.MainWindowHandle, miSW_RESTORE)
+                        SetForegroundWindow(poProcess.MainWindowHandle)
+                        Return
+                    End If
+
+                Catch
+                    ' Ignore individual Explorer process access issues.
+                End Try
+            Next
+
+        Catch
+            ' Explorer opened successfully; foreground promotion is best-effort only.
+        End Try
     End Sub
 
     ' ---------- JSON models ----------
@@ -749,15 +1075,7 @@ Public Class frmMain
         Public Property Text As String
     End Class
 
-    Private Sub txtSearch_KeyDown(sender As Object, e As KeyEventArgs) Handles txtSearch.KeyDown
-        If e.KeyCode = Keys.Enter Then
-            e.Handled = True
-            btnSearch_Click(Nothing, Nothing)
-        End If
-    End Sub
 
-    Private Sub txtSearch_GotFocus(sender As Object, e As EventArgs) Handles txtSearch.GotFocus
-        txtSearch.SelectionStart = 0
-        txtSearch.SelectionLength = txtSearch.Text.Length
-    End Sub
+
+
 End Class
