@@ -44,6 +44,7 @@ Partial Class frmMain
         btnSearch = New Button()
         txtSearch = New TextBox()
         lvwSelected = New ListView()
+        btnExclude = New ToolStripButton()
         tspMenu.SuspendLayout()
         CType(splBase, ComponentModel.ISupportInitialize).BeginInit()
         splBase.Panel1.SuspendLayout()
@@ -57,7 +58,7 @@ Partial Class frmMain
         tspMenu.BackColor = SystemColors.ControlDark
         tspMenu.GripStyle = ToolStripGripStyle.Hidden
         tspMenu.ImageScalingSize = New Size(32, 32)
-        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnExport, ToolStripSeparator2})
+        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, btnExclude, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnExport, ToolStripSeparator2})
         tspMenu.Location = New Point(0, 0)
         tspMenu.Name = "tspMenu"
         tspMenu.Padding = New Padding(10, 0, 10, 0)
@@ -257,6 +258,18 @@ Partial Class frmMain
         lvwSelected.TabIndex = 0
         lvwSelected.UseCompatibleStateImageBehavior = False
         ' 
+        ' btnExclude
+        ' 
+        btnExclude.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExclude.Image = CType(resources.GetObject("btnExclude.Image"), Image)
+        btnExclude.ImageTransparentColor = Color.Magenta
+        btnExclude.Margin = New Padding(0, 1, 5, 2)
+        btnExclude.Name = "btnExclude"
+        btnExclude.Size = New Size(36, 36)
+        btnExclude.Text = "Exclude Folders"
+        btnExclude.TextAlign = ContentAlignment.BottomCenter
+        btnExclude.ToolTipText = "Exclude selected folders"
+        ' 
         ' frmMain
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -300,5 +313,6 @@ Partial Class frmMain
     Friend WithEvents btnExport As ToolStripButton
     Friend WithEvents lvwSelected As ListView
     Friend WithEvents cboOutput As ToolStripComboBox
+    Friend WithEvents btnExclude As ToolStripButton
 
 End Class

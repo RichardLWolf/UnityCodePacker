@@ -38,6 +38,11 @@ Public Class frmMain
     Private fsLastSearchText As String = String.Empty
     Private foLastFoundNode As TreeNode = Nothing
 
+    '---- excluded folders list
+    Private Const ksExcludedFoldersSettingName As String = "ExcludedAssetFoldersJson"
+    Private Const ksExcludedFoldersFallbackFileName As String = "ExcludedAssetFolders.json"
+    Private foExcludedFolders As New List(Of String)
+
     ' Broad set of Unity/project text files that are useful to include in a code pack.
     ' These are intentionally text-oriented file types only.
     Private Shared ReadOnly moAllowedExtensions As HashSet(Of String) =
@@ -73,6 +78,8 @@ Public Class frmMain
 
         Dim psUnity As String = My.Settings.UnityFolder
         Dim psExport As String = My.Settings.ExportFolder
+
+        foExcludedFolders = LoadExcludedFoldersFromSettings()
 
         If Not String.IsNullOrWhiteSpace(psUnity) AndAlso Directory.Exists(psUnity) Then
 
@@ -141,6 +148,216 @@ Public Class frmMain
         lvwSelected.Columns(0).Width = Math.Max(120, lvwSelected.ClientSize.Width - 8)
 
     End Sub
+
+    ' ------------------- exclude folders selection 
+    Private Sub btnExclude_Click(sender As Object, e As EventArgs) Handles btnExclude.Click
+
+        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
+            MessageBox.Show(Me, "Select a valid Unity project folder first.", "Missing Assets Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Exit Sub
+        End If
+
+        Dim poCheckedFiles As New HashSet(Of String)(GetCheckedFiles(), StringComparer.OrdinalIgnoreCase)
+        Dim poExpandedFolders As HashSet(Of String) = GetExpandedFolderPaths()
+        Dim psSelectedPath As String = GetSelectedNodePath()
+
+        Using poFrm As New frmExcludeFolders
+            poFrm.Initialize(fsAssetsRoot, foExcludedFolders)
+
+            If poFrm.ShowDialog(Me) = DialogResult.OK Then
+                foExcludedFolders = NormalizeExcludedFolderList(poFrm.SelectedFolderList)
+                SaveExcludedFoldersToSettings()
+                BuildTree(poCheckedFiles, poExpandedFolders, psSelectedPath)
+            End If
+        End Using
+
+    End Sub
+
+
+
+    Private Function LoadExcludedFoldersFromSettings() As List(Of String)
+
+        Dim poList As New List(Of String)()
+
+        Try
+            Dim psJson As String = GetStringSettingValue(ksExcludedFoldersSettingName)
+
+            If String.IsNullOrWhiteSpace(psJson) Then
+                psJson = ReadExcludedFoldersFallbackFile()
+            End If
+
+            If Not String.IsNullOrWhiteSpace(psJson) Then
+                Dim poLoaded As List(Of String) = JsonConvert.DeserializeObject(Of List(Of String))(psJson)
+
+                If poLoaded IsNot Nothing Then
+                    poList = poLoaded
+                End If
+            End If
+
+        Catch
+            poList = New List(Of String)()
+        End Try
+
+        Return NormalizeExcludedFolderList(poList)
+
+    End Function
+
+    Private Sub SaveExcludedFoldersToSettings()
+
+        Dim psJson As String = JsonConvert.SerializeObject(NormalizeExcludedFolderList(foExcludedFolders), Formatting.None)
+
+        If SetStringSettingValue(ksExcludedFoldersSettingName, psJson) Then
+            My.Settings.Save()
+            Return
+        End If
+
+        WriteExcludedFoldersFallbackFile(psJson)
+
+    End Sub
+
+    Private Function GetStringSettingValue(ByVal sSettingName As String) As String
+
+        Try
+            If My.Settings.Properties(sSettingName) Is Nothing Then Return String.Empty
+
+            Dim poValue As Object = My.Settings(sSettingName)
+            If poValue Is Nothing Then Return String.Empty
+
+            Return Convert.ToString(poValue)
+
+        Catch
+            Return String.Empty
+        End Try
+
+    End Function
+
+    Private Function SetStringSettingValue(ByVal sSettingName As String, ByVal sValue As String) As Boolean
+
+        Try
+            If My.Settings.Properties(sSettingName) Is Nothing Then Return False
+
+            My.Settings(sSettingName) = sValue
+            Return True
+
+        Catch
+            Return False
+        End Try
+
+    End Function
+
+    Private Function ReadExcludedFoldersFallbackFile() As String
+
+        Try
+            Dim psPath As String = GetExcludedFoldersFallbackPath()
+
+            If Not File.Exists(psPath) Then Return String.Empty
+
+            Return File.ReadAllText(psPath, Encoding.UTF8)
+
+        Catch
+            Return String.Empty
+        End Try
+
+    End Function
+
+    Private Sub WriteExcludedFoldersFallbackFile(ByVal sJson As String)
+
+        Dim psPath As String = GetExcludedFoldersFallbackPath()
+        Dim psFolder As String = Path.GetDirectoryName(psPath)
+
+        If Not String.IsNullOrWhiteSpace(psFolder) Then
+            Directory.CreateDirectory(psFolder)
+        End If
+
+        File.WriteAllText(psPath, sJson, New UTF8Encoding(False))
+
+    End Sub
+
+    Private Function GetExcludedFoldersFallbackPath() As String
+
+        Dim psCompanyName As String = Application.CompanyName
+        Dim psProductName As String = Application.ProductName
+
+        If String.IsNullOrWhiteSpace(psCompanyName) Then psCompanyName = "CodePacker"
+        If String.IsNullOrWhiteSpace(psProductName) Then psProductName = "CodePacker"
+
+        Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), psCompanyName, psProductName, ksExcludedFoldersFallbackFileName)
+
+    End Function
+
+    Private Function NormalizeExcludedFolderList(ByVal oFolderList As IEnumerable(Of String)) As List(Of String)
+
+        Dim poOut As New List(Of String)()
+        Dim poSeen As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        If oFolderList Is Nothing Then Return poOut
+
+        For Each psFolder As String In oFolderList
+
+            Dim psRelativeFolder As String = NormalizeAssetRelativeFolder(psFolder)
+
+            If String.IsNullOrWhiteSpace(psRelativeFolder) Then Continue For
+            If poSeen.Contains(psRelativeFolder) Then Continue For
+
+            poSeen.Add(psRelativeFolder)
+            poOut.Add(psRelativeFolder)
+
+        Next
+
+        poOut.Sort(StringComparer.OrdinalIgnoreCase)
+        Return poOut
+
+    End Function
+
+    Private Function NormalizeAssetRelativeFolder(ByVal sFolder As String) As String
+
+        If String.IsNullOrWhiteSpace(sFolder) Then Return String.Empty
+
+        Dim psFolder As String = sFolder.Trim().Replace("\", "/")
+
+        If Path.IsPathRooted(psFolder) Then
+            psFolder = GetAssetRelativeFolderPath(psFolder)
+        End If
+
+        If psFolder.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) Then
+            psFolder = psFolder.Substring("Assets/".Length)
+        ElseIf String.Equals(psFolder, "Assets", StringComparison.OrdinalIgnoreCase) Then
+            psFolder = String.Empty
+        End If
+
+        psFolder = psFolder.Trim("/"c)
+
+        While psFolder.Contains("//")
+            psFolder = psFolder.Replace("//", "/")
+        End While
+
+        Return psFolder
+
+    End Function
+
+    Private Function GetAssetRelativeFolderPath(ByVal sFolder As String) As String
+
+        If String.IsNullOrWhiteSpace(sFolder) Then Return String.Empty
+        If String.IsNullOrWhiteSpace(fsAssetsRoot) Then Return String.Empty
+
+        Try
+            Dim psFull As String = Path.GetFullPath(sFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            Dim psAssets As String = Path.GetFullPath(fsAssetsRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            Dim psAssetsPrefix As String = psAssets & Path.DirectorySeparatorChar
+
+            If String.Equals(psFull, psAssets, StringComparison.OrdinalIgnoreCase) Then Return String.Empty
+
+            If psFull.StartsWith(psAssetsPrefix, StringComparison.OrdinalIgnoreCase) Then
+                Return psFull.Substring(psAssetsPrefix.Length).Replace("\", "/").Trim("/"c)
+            End If
+
+        Catch
+            Return String.Empty
+        End Try
+
+        Return String.Empty
+
+    End Function
 
     Private Sub ClearAssetsTreeAndSelectedList()
 
@@ -291,6 +508,30 @@ Public Class frmMain
             Case "library", "temp", "obj", "logs", ".git", "builds", "packagesettings", "usersettings"
                 Return True
         End Select
+
+        If IsExcludedAssetFolder(sFolder) Then Return True
+
+        Return False
+
+    End Function
+
+    Private Function IsExcludedAssetFolder(ByVal sFolder As String) As Boolean
+
+        Dim psRelativeFolder As String = GetAssetRelativeFolderPath(sFolder)
+
+        If String.IsNullOrWhiteSpace(psRelativeFolder) Then Return False
+
+        For Each psExcludedFolder As String In foExcludedFolders
+
+            Dim psCleanExcludedFolder As String = NormalizeAssetRelativeFolder(psExcludedFolder)
+
+            If String.IsNullOrWhiteSpace(psCleanExcludedFolder) Then Continue For
+
+            If String.Equals(psRelativeFolder, psCleanExcludedFolder, StringComparison.OrdinalIgnoreCase) Then Return True
+
+            If psRelativeFolder.StartsWith(psCleanExcludedFolder & "/", StringComparison.OrdinalIgnoreCase) Then Return True
+
+        Next
 
         Return False
 
@@ -1074,8 +1315,5 @@ Public Class frmMain
         Public Property Sha256 As String
         Public Property Text As String
     End Class
-
-
-
 
 End Class
