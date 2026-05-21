@@ -1060,7 +1060,6 @@ Public Class frmMain
         End If
 
         Try
-
             Dim poPack As New UnityCsPack
             poPack.Format = "UnityCsPack.v2"
             poPack.UnityRoot = fsUnityRoot
@@ -1069,7 +1068,6 @@ Public Class frmMain
             poPack.Files = New List(Of UnityCsFileEntry)
 
             For Each psFile In poFiles
-
                 Dim psText = ReadFilePreserveFormatting(psFile)
 
                 Dim poEntry As New UnityCsFileEntry
@@ -1078,7 +1076,6 @@ Public Class frmMain
                 poEntry.Text = psText
 
                 poPack.Files.Add(poEntry)
-
             Next
 
             Dim poJsonSettings As New JsonSerializerSettings
@@ -1087,28 +1084,33 @@ Public Class frmMain
 
             Dim psJson = JsonConvert.SerializeObject(poPack, poJsonSettings)
 
-            Dim psZipPath = txtExportTo.Text.Trim
+            Dim psExportFolder As String = txtExportTo.Text.Trim
 
-            If Not psZipPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) Then
-                psZipPath &= ".zip"
+            If psExportFolder.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) OrElse psExportFolder.EndsWith(".json", StringComparison.OrdinalIgnoreCase) Then
+                psExportFolder = Path.GetDirectoryName(psExportFolder)
             End If
 
-            Dim psOutFolder = Path.GetDirectoryName(psZipPath)
-            If String.IsNullOrWhiteSpace(psOutFolder) Then
+            If String.IsNullOrWhiteSpace(psExportFolder) Then
                 Throw New InvalidOperationException("The export folder is invalid.")
             End If
 
-            Directory.CreateDirectory(psOutFolder)
+            Directory.CreateDirectory(psExportFolder)
 
-            Dim psJsonPath = Path.Combine(psOutFolder, "codepack.json")
+            For Each psOldCodepackFile As String In Directory.GetFiles(psExportFolder, "codepack*.*")
+                File.Delete(psOldCodepackFile)
+            Next
 
-            If File.Exists(psJsonPath) Then File.Delete(psJsonPath)
-            If File.Exists(psZipPath) Then File.Delete(psZipPath)
+            Dim psTimestamp As String = Date.Now.ToString("yyMMddHHmmss")
+            Dim psJsonFileName As String = $"codepack-{psTimestamp}.json"
+            Dim psZipFileName As String = $"codepack-{psTimestamp}.zip"
+
+            Dim psJsonPath As String = Path.Combine(psExportFolder, psJsonFileName)
+            Dim psZipPath As String = Path.Combine(psExportFolder, psZipFileName)
 
             File.WriteAllText(psJsonPath, psJson, New UTF8Encoding(False))
 
             Using poArchive = ZipFile.Open(psZipPath, ZipArchiveMode.Create)
-                poArchive.CreateEntryFromFile(psJsonPath, "codepack.json", CompressionLevel.Optimal)
+                poArchive.CreateEntryFromFile(psJsonPath, psJsonFileName, CompressionLevel.Optimal)
             End Using
 
             If Not pbKeepJSON Then
@@ -1121,7 +1123,6 @@ Public Class frmMain
         Catch ex As Exception
             MessageBox.Show(Me, ex.Message, "Export Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
-
     End Sub
 
     Private Function GetCheckedFiles() As List(Of String)
