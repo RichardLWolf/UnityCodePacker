@@ -59,7 +59,7 @@ Partial Class frmMain
         tspMenu.BackColor = SystemColors.ControlDark
         tspMenu.GripStyle = ToolStripGripStyle.Hidden
         tspMenu.ImageScalingSize = New Size(32, 32)
-        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, btnExclude, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnIncludeMetaFiles, btnExport, ToolStripSeparator2})
+        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, btnExclude, btnIncludeMetaFiles, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnExport, ToolStripSeparator2})
         tspMenu.Location = New Point(0, 0)
         tspMenu.Name = "tspMenu"
         tspMenu.Padding = New Padding(10, 0, 10, 0)
