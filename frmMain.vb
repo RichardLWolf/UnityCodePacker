@@ -43,6 +43,9 @@ Public Class frmMain
     Private Const ksExcludedFoldersFallbackFileName As String = "ExcludedAssetFolders.json"
     Private foExcludedFolders As New List(Of String)
 
+    '---- included files options
+    Private fbIncludeMetaFiles As Boolean = False
+
     ' Broad set of Unity/project text files that are useful to include in a code pack.
     ' These are intentionally text-oriented file types only.
     Private Shared ReadOnly moAllowedExtensions As HashSet(Of String) =
@@ -113,6 +116,8 @@ Public Class frmMain
 
         ConfigureSelectedListView()
         SyncSelectedListViewFromTree()
+
+        fbIncludeMetaFiles = btnIncludeMetaFiles.Checked
 
     End Sub
 
@@ -400,6 +405,10 @@ Public Class frmMain
 
     End Sub
 
+    Private Sub btnIncludeMetaFiles_Click(sender As Object, e As EventArgs) Handles btnIncludeMetaFiles.Click
+        fbIncludeMetaFiles = btnIncludeMetaFiles.Checked
+    End Sub
+
     Private Sub BuildTree(Optional oCheckedFiles As HashSet(Of String) = Nothing, Optional oExpandedFolders As HashSet(Of String) = Nothing, Optional sSelectedPath As String = "")
 
         ResetSearchState()
@@ -505,7 +514,7 @@ Public Class frmMain
         If String.IsNullOrWhiteSpace(psName) Then Return False
 
         Select Case psName.ToLowerInvariant()
-            Case "library", "temp", "obj", "logs", ".git", "builds", "packagesettings", "usersettings"
+            Case "library", "temp", "obj", ".git", "builds", "packagesettings", "usersettings"
                 Return True
         End Select
 
@@ -1051,7 +1060,7 @@ Public Class frmMain
             Exit Sub
         End If
 
-        Dim poFiles = GetCheckedFiles()
+        Dim poFiles As List(Of String) = GetCheckedFiles()
         Dim pbKeepJSON As Boolean = CBool(cboOutput.SelectedIndex = 1)
 
         If poFiles.Count = 0 Then
@@ -1060,6 +1069,8 @@ Public Class frmMain
         End If
 
         Try
+            Dim poExportFiles As List(Of String) = GetExportFiles(poFiles)
+
             Dim poPack As New UnityCsPack
             poPack.Format = "UnityCsPack.v2"
             poPack.UnityRoot = fsUnityRoot
@@ -1067,7 +1078,7 @@ Public Class frmMain
             poPack.CreatedUtc = Date.UtcNow
             poPack.Files = New List(Of UnityCsFileEntry)
 
-            For Each psFile In poFiles
+            For Each psFile As String In poExportFiles
                 Dim psText = ReadFilePreserveFormatting(psFile)
 
                 Dim poEntry As New UnityCsFileEntry
@@ -1117,7 +1128,7 @@ Public Class frmMain
                 File.Delete(psJsonPath)
             End If
 
-            MessageBox.Show(Me, $"Exported {poFiles.Count} file(s) to ZIP.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Me, $"Exported {poExportFiles.Count} file(s) to ZIP.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
             OpenExplorerSelectFile(psZipPath)
 
         Catch ex As Exception
@@ -1136,6 +1147,37 @@ Public Class frmMain
         Next
 
         Return poList.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+
+    End Function
+
+
+    Private Function GetExportFiles(ByVal oSelectedFiles As IEnumerable(Of String)) As List(Of String)
+
+        Dim poExportFiles As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        If oSelectedFiles Is Nothing Then Return poExportFiles.ToList()
+
+        For Each psFile As String In oSelectedFiles
+
+            If String.IsNullOrWhiteSpace(psFile) OrElse Not File.Exists(psFile) Then Continue For
+
+            poExportFiles.Add(psFile)
+
+            If Not fbIncludeMetaFiles Then Continue For
+
+            ' Unity sidecar files retain the complete source filename, including its extension.
+            ' Example: SomeFile.cs -> SomeFile.cs.meta
+            Dim psMetaFile As String = psFile & ".meta"
+
+            If File.Exists(psMetaFile) Then
+                poExportFiles.Add(psMetaFile)
+            End If
+
+        Next
+
+        Dim poSortedFiles As List(Of String) = poExportFiles.ToList()
+        poSortedFiles.Sort(StringComparer.OrdinalIgnoreCase)
+        Return poSortedFiles
 
     End Function
 
@@ -1316,5 +1358,6 @@ Public Class frmMain
         Public Property Sha256 As String
         Public Property Text As String
     End Class
+
 
 End Class

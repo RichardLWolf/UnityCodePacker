@@ -28,6 +28,7 @@ Partial Class frmMain
         btnRefresh = New ToolStripButton()
         btnSelectAll = New ToolStripButton()
         btnSelectNone = New ToolStripButton()
+        btnExclude = New ToolStripButton()
         ToolStripSeparator1 = New ToolStripSeparator()
         ToolStripLabel1 = New ToolStripLabel()
         txtExportTo = New ToolStripTextBox()
@@ -35,6 +36,7 @@ Partial Class frmMain
         btnSelectUnity = New ToolStripButton()
         lblUnityFolder = New ToolStripLabel()
         cboOutput = New ToolStripComboBox()
+        btnIncludeMetaFiles = New ToolStripButton()
         btnExport = New ToolStripButton()
         ToolStripSeparator2 = New ToolStripSeparator()
         tvwFiles = New TreeView()
@@ -44,7 +46,6 @@ Partial Class frmMain
         btnSearch = New Button()
         txtSearch = New TextBox()
         lvwSelected = New ListView()
-        btnExclude = New ToolStripButton()
         tspMenu.SuspendLayout()
         CType(splBase, ComponentModel.ISupportInitialize).BeginInit()
         splBase.Panel1.SuspendLayout()
@@ -58,7 +59,7 @@ Partial Class frmMain
         tspMenu.BackColor = SystemColors.ControlDark
         tspMenu.GripStyle = ToolStripGripStyle.Hidden
         tspMenu.ImageScalingSize = New Size(32, 32)
-        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, btnExclude, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnExport, ToolStripSeparator2})
+        tspMenu.Items.AddRange(New ToolStripItem() {btnRefresh, btnSelectAll, btnSelectNone, btnExclude, ToolStripSeparator1, ToolStripLabel1, txtExportTo, btnBrowseExport, btnSelectUnity, lblUnityFolder, cboOutput, btnIncludeMetaFiles, btnExport, ToolStripSeparator2})
         tspMenu.Location = New Point(0, 0)
         tspMenu.Name = "tspMenu"
         tspMenu.Padding = New Padding(10, 0, 10, 0)
@@ -99,6 +100,18 @@ Partial Class frmMain
         btnSelectNone.Text = "Select none"
         btnSelectNone.TextAlign = ContentAlignment.BottomCenter
         btnSelectNone.ToolTipText = "Select None"
+        ' 
+        ' btnExclude
+        ' 
+        btnExclude.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExclude.Image = CType(resources.GetObject("btnExclude.Image"), Image)
+        btnExclude.ImageTransparentColor = Color.Magenta
+        btnExclude.Margin = New Padding(0, 1, 5, 2)
+        btnExclude.Name = "btnExclude"
+        btnExclude.Size = New Size(36, 36)
+        btnExclude.Text = "Exclude Folders"
+        btnExclude.TextAlign = ContentAlignment.BottomCenter
+        btnExclude.ToolTipText = "Exclude selected folders"
         ' 
         ' ToolStripSeparator1
         ' 
@@ -159,6 +172,17 @@ Partial Class frmMain
         cboOutput.Size = New Size(121, 39)
         cboOutput.ToolTipText = "Output Options"
         ' 
+        ' btnIncludeMetaFiles
+        ' 
+        btnIncludeMetaFiles.CheckOnClick = True
+        btnIncludeMetaFiles.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnIncludeMetaFiles.Image = CType(resources.GetObject("btnIncludeMetaFiles.Image"), Image)
+        btnIncludeMetaFiles.ImageTransparentColor = Color.Magenta
+        btnIncludeMetaFiles.Name = "btnIncludeMetaFiles"
+        btnIncludeMetaFiles.Size = New Size(36, 36)
+        btnIncludeMetaFiles.Text = "Include META"
+        btnIncludeMetaFiles.ToolTipText = "Include META files"
+        ' 
         ' btnExport
         ' 
         btnExport.DisplayStyle = ToolStripItemDisplayStyle.Image
@@ -196,6 +220,7 @@ Partial Class frmMain
         imlIcons.Images.SetKeyName(0, "folder_closed")
         imlIcons.Images.SetKeyName(1, "folder_open")
         imlIcons.Images.SetKeyName(2, "c_file")
+        imlIcons.Images.SetKeyName(3, "meta_file")
         ' 
         ' splBase
         ' 
@@ -258,18 +283,6 @@ Partial Class frmMain
         lvwSelected.TabIndex = 0
         lvwSelected.UseCompatibleStateImageBehavior = False
         ' 
-        ' btnExclude
-        ' 
-        btnExclude.DisplayStyle = ToolStripItemDisplayStyle.Image
-        btnExclude.Image = CType(resources.GetObject("btnExclude.Image"), Image)
-        btnExclude.ImageTransparentColor = Color.Magenta
-        btnExclude.Margin = New Padding(0, 1, 5, 2)
-        btnExclude.Name = "btnExclude"
-        btnExclude.Size = New Size(36, 36)
-        btnExclude.Text = "Exclude Folders"
-        btnExclude.TextAlign = ContentAlignment.BottomCenter
-        btnExclude.ToolTipText = "Exclude selected folders"
-        ' 
         ' frmMain
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -314,5 +327,6 @@ Partial Class frmMain
     Friend WithEvents lvwSelected As ListView
     Friend WithEvents cboOutput As ToolStripComboBox
     Friend WithEvents btnExclude As ToolStripButton
+    Friend WithEvents btnIncludeMetaFiles As ToolStripButton
 
 End Class
