@@ -32,6 +32,7 @@ Public Class frmMain
     ' --- state ---
     Private fsUnityRoot As String = String.Empty
     Private fsAssetsRoot As String = String.Empty
+    Private fsGameContentRoot As String = String.Empty
     Private fbTreeBusy As Boolean = False
 
     ' --- search state ---
@@ -87,22 +88,19 @@ Public Class frmMain
         If Not String.IsNullOrWhiteSpace(psUnity) AndAlso Directory.Exists(psUnity) Then
 
             fsUnityRoot = psUnity.Trim()
-            fsAssetsRoot = Path.Combine(fsUnityRoot, "Assets")
+            SetProjectRoots()
 
-            If Directory.Exists(fsAssetsRoot) Then
+            If AreProjectRootsValid() Then
                 lblUnityFolder.Text = "Unity Folder: " & fsUnityRoot
-                lblUnityFolder.ToolTipText = fsAssetsRoot
+                lblUnityFolder.ToolTipText = fsUnityRoot
                 BuildTree()
             Else
-                fsUnityRoot = String.Empty
-                fsAssetsRoot = String.Empty
-                lblUnityFolder.Text = "Unity Folder:"
-                lblUnityFolder.ToolTipText = String.Empty
-                ClearAssetsTreeAndSelectedList()
+                ClearProjectSelection()
+                ClearContentTreeAndSelectedList()
             End If
 
         Else
-            ClearAssetsTreeAndSelectedList()
+            ClearContentTreeAndSelectedList()
         End If
 
         If Not String.IsNullOrWhiteSpace(psExport) AndAlso Directory.Exists(psExport) Then
@@ -364,7 +362,41 @@ Public Class frmMain
 
     End Function
 
-    Private Sub ClearAssetsTreeAndSelectedList()
+    Private Sub SetProjectRoots()
+
+        If String.IsNullOrWhiteSpace(fsUnityRoot) Then
+            fsAssetsRoot = String.Empty
+            fsGameContentRoot = String.Empty
+            Return
+        End If
+
+        fsAssetsRoot = Path.Combine(fsUnityRoot, "Assets")
+        fsGameContentRoot = Path.Combine(fsUnityRoot, "GameContent")
+
+    End Sub
+
+    Private Function AreProjectRootsValid() As Boolean
+
+        Return Not String.IsNullOrWhiteSpace(fsUnityRoot) AndAlso
+               Directory.Exists(fsUnityRoot) AndAlso
+               Not String.IsNullOrWhiteSpace(fsAssetsRoot) AndAlso
+               Directory.Exists(fsAssetsRoot) AndAlso
+               Not String.IsNullOrWhiteSpace(fsGameContentRoot) AndAlso
+               Directory.Exists(fsGameContentRoot)
+
+    End Function
+
+    Private Sub ClearProjectSelection()
+
+        fsUnityRoot = String.Empty
+        fsAssetsRoot = String.Empty
+        fsGameContentRoot = String.Empty
+        lblUnityFolder.Text = "Unity Folder:"
+        lblUnityFolder.ToolTipText = String.Empty
+
+    End Sub
+
+    Private Sub ClearContentTreeAndSelectedList()
 
         tvwFiles.Nodes.Clear()
         lvwSelected.Items.Clear()
@@ -376,27 +408,24 @@ Public Class frmMain
     Private Sub btnSelectUnity_Click(sender As Object, e As EventArgs) Handles btnSelectUnity.Click
 
         Dim poDlg As New FolderBrowserDialog()
-        poDlg.Description = "Select Unity project root folder (the folder that contains Assets\)"
+        poDlg.Description = "Select Unity project root folder (the folder that contains Assets\ and GameContent\)"
         poDlg.UseDescriptionForTitle = True
 
         If Directory.Exists(fsUnityRoot) Then poDlg.SelectedPath = fsUnityRoot
         If poDlg.ShowDialog(Me) <> DialogResult.OK Then Exit Sub
 
         fsUnityRoot = poDlg.SelectedPath.Trim()
-        fsAssetsRoot = Path.Combine(fsUnityRoot, "Assets")
+        SetProjectRoots()
 
-        If Not Directory.Exists(fsAssetsRoot) Then
-            MessageBox.Show(Me, "That folder does not contain an Assets\ folder. Pick the Unity project root.", "Invalid Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            fsUnityRoot = String.Empty
-            fsAssetsRoot = String.Empty
-            lblUnityFolder.Text = "Unity Folder:"
-            lblUnityFolder.ToolTipText = String.Empty
-            ClearAssetsTreeAndSelectedList()
+        If Not AreProjectRootsValid() Then
+            MessageBox.Show(Me, "That folder must contain both Assets\ and GameContent\ folders. Pick the Unity project root.", "Invalid Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            ClearProjectSelection()
+            ClearContentTreeAndSelectedList()
             Exit Sub
         End If
 
         lblUnityFolder.Text = "Unity Folder: " & fsUnityRoot
-        lblUnityFolder.ToolTipText = fsAssetsRoot
+        lblUnityFolder.ToolTipText = fsUnityRoot
 
         My.Settings.UnityFolder = fsUnityRoot
         My.Settings.Save()
@@ -413,8 +442,8 @@ Public Class frmMain
 
         ResetSearchState()
 
-        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
-            ClearAssetsTreeAndSelectedList()
+        If Not AreProjectRootsValid() Then
+            ClearContentTreeAndSelectedList()
             Exit Sub
         End If
 
@@ -425,18 +454,26 @@ Public Class frmMain
 
             tvwFiles.Nodes.Clear()
 
-            Dim poRootNode As TreeNode = CreateFolderNode(fsAssetsRoot)
-            tvwFiles.Nodes.Add(poRootNode)
+            Dim poAssetsRootNode As TreeNode = CreateFolderNode(fsAssetsRoot)
+            Dim poGameContentRootNode As TreeNode = CreateFolderNode(fsGameContentRoot)
+
+            tvwFiles.Nodes.Add(poAssetsRootNode)
+            tvwFiles.Nodes.Add(poGameContentRootNode)
 
             If oCheckedFiles IsNot Nothing AndAlso oCheckedFiles.Count > 0 Then
-                ApplyCheckedFilesToTree(poRootNode, oCheckedFiles)
-                UpdateFolderChecksRecursive(poRootNode)
+                For Each poRootNode As TreeNode In tvwFiles.Nodes
+                    ApplyCheckedFilesToTree(poRootNode, oCheckedFiles)
+                    UpdateFolderChecksRecursive(poRootNode)
+                Next
             End If
 
             If oExpandedFolders IsNot Nothing AndAlso oExpandedFolders.Count > 0 Then
-                ApplyExpandedFoldersToTree(poRootNode, oExpandedFolders)
+                For Each poRootNode As TreeNode In tvwFiles.Nodes
+                    ApplyExpandedFoldersToTree(poRootNode, oExpandedFolders)
+                Next
             Else
-                poRootNode.Expand()
+                poAssetsRootNode.Expand()
+                poGameContentRootNode.Expand()
             End If
 
             If Not String.IsNullOrWhiteSpace(sSelectedPath) Then
@@ -1050,8 +1087,8 @@ Public Class frmMain
             Exit Sub
         End If
 
-        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
-            MessageBox.Show(Me, "Assets folder was not found.", "Missing Assets Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        If Not AreProjectRootsValid() Then
+            MessageBox.Show(Me, "Assets\ and GameContent\ folders must both exist under the selected Unity project root.", "Missing Project Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Exit Sub
         End If
 
@@ -1183,9 +1220,9 @@ Public Class frmMain
 
     Private Sub btnRefresh_Click(sender As Object, e As EventArgs) Handles btnRefresh.Click
 
-        If String.IsNullOrWhiteSpace(fsAssetsRoot) OrElse Not Directory.Exists(fsAssetsRoot) Then
+        If Not AreProjectRootsValid() Then
             System.Media.SystemSounds.Beep.Play()
-            ClearAssetsTreeAndSelectedList()
+            ClearContentTreeAndSelectedList()
             Exit Sub
         End If
 
@@ -1237,26 +1274,26 @@ Public Class frmMain
 
     Private Function MakeUnityRelativePath(sFullPath As String) As String
 
+        If String.IsNullOrWhiteSpace(sFullPath) Then
+            Throw New ArgumentException("A source file path is required.", NameOf(sFullPath))
+        End If
+
         Dim psFull As String = Path.GetFullPath(sFullPath)
-        Dim psAssets As String = Path.GetFullPath(fsAssetsRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-        Dim psAssetsPrefix As String = psAssets & Path.DirectorySeparatorChar
+        Dim psUnityRoot As String = Path.GetFullPath(fsUnityRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        Dim psUnityPrefix As String = psUnityRoot & Path.DirectorySeparatorChar
 
-        If String.Equals(psFull, psAssets, StringComparison.OrdinalIgnoreCase) Then
-            Return "Assets"
+        If Not psFull.StartsWith(psUnityPrefix, StringComparison.OrdinalIgnoreCase) Then
+            Throw New InvalidOperationException("Selected file is outside the Unity project root: " & psFull)
         End If
 
-        If psFull.StartsWith(psAssetsPrefix, StringComparison.OrdinalIgnoreCase) Then
-            Dim psRel As String = "Assets" & psFull.Substring(psAssets.Length)
-            Return psRel.Replace("\", "/")
+        Dim psRelative As String = psFull.Substring(psUnityPrefix.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+
+        If Not psRelative.StartsWith("Assets" & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) AndAlso
+           Not psRelative.StartsWith("GameContent" & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+            Throw New InvalidOperationException("Selected file is outside the supported Assets\ and GameContent\ roots: " & psFull)
         End If
 
-        Dim psRoot As String = Path.GetFullPath(fsUnityRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) & Path.DirectorySeparatorChar
-
-        If psFull.StartsWith(psRoot, StringComparison.OrdinalIgnoreCase) Then
-            Return psFull.Substring(psRoot.Length).Replace("\", "/")
-        End If
-
-        Return psFull.Replace("\", "/")
+        Return "..\" & psRelative.Replace("/", "\")
 
     End Function
 
@@ -1359,5 +1396,41 @@ Public Class frmMain
         Public Property Text As String
     End Class
 
+    Private Sub btnClearText_Click(sender As Object, e As EventArgs) Handles btnClearText.Click
+        txtSearch.Text = String.Empty
+        txtSearch.Focus()
+        txtSearch.Select()
+    End Sub
 
+    Private Sub btxExpandAll_Click(sender As Object, e As EventArgs) Handles btxExpandAll.Click
+
+        If tvwFiles.Nodes.Count = 0 Then Exit Sub
+
+        tvwFiles.BeginUpdate()
+
+        Try
+            tvwFiles.ExpandAll()
+        Finally
+            tvwFiles.EndUpdate()
+        End Try
+
+        If tvwFiles.SelectedNode IsNot Nothing Then
+            tvwFiles.SelectedNode.EnsureVisible()
+        End If
+
+    End Sub
+
+    Private Sub btnCollapseAll_Click(sender As Object, e As EventArgs) Handles btnCollapseAll.Click
+
+        If tvwFiles.Nodes.Count = 0 Then Exit Sub
+
+        tvwFiles.BeginUpdate()
+
+        Try
+            tvwFiles.CollapseAll()
+        Finally
+            tvwFiles.EndUpdate()
+        End Try
+
+    End Sub
 End Class

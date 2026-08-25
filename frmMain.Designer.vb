@@ -29,6 +29,7 @@ Partial Class frmMain
         btnSelectAll = New ToolStripButton()
         btnSelectNone = New ToolStripButton()
         btnExclude = New ToolStripButton()
+        btnIncludeMetaFiles = New ToolStripButton()
         ToolStripSeparator1 = New ToolStripSeparator()
         ToolStripLabel1 = New ToolStripLabel()
         txtExportTo = New ToolStripTextBox()
@@ -36,16 +37,19 @@ Partial Class frmMain
         btnSelectUnity = New ToolStripButton()
         lblUnityFolder = New ToolStripLabel()
         cboOutput = New ToolStripComboBox()
-        btnIncludeMetaFiles = New ToolStripButton()
         btnExport = New ToolStripButton()
         ToolStripSeparator2 = New ToolStripSeparator()
         tvwFiles = New TreeView()
         imlIcons = New ImageList(components)
         splBase = New SplitContainer()
         panSearch = New Panel()
+        btnCollapseAll = New Button()
+        btxExpandAll = New Button()
+        btnClearText = New Button()
         btnSearch = New Button()
         txtSearch = New TextBox()
         lvwSelected = New ListView()
+        ToolTip1 = New ToolTip(components)
         tspMenu.SuspendLayout()
         CType(splBase, ComponentModel.ISupportInitialize).BeginInit()
         splBase.Panel1.SuspendLayout()
@@ -113,6 +117,17 @@ Partial Class frmMain
         btnExclude.TextAlign = ContentAlignment.BottomCenter
         btnExclude.ToolTipText = "Exclude selected folders"
         ' 
+        ' btnIncludeMetaFiles
+        ' 
+        btnIncludeMetaFiles.CheckOnClick = True
+        btnIncludeMetaFiles.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnIncludeMetaFiles.Image = CType(resources.GetObject("btnIncludeMetaFiles.Image"), Image)
+        btnIncludeMetaFiles.ImageTransparentColor = Color.Magenta
+        btnIncludeMetaFiles.Name = "btnIncludeMetaFiles"
+        btnIncludeMetaFiles.Size = New Size(36, 36)
+        btnIncludeMetaFiles.Text = "Include META"
+        btnIncludeMetaFiles.ToolTipText = "Include META files"
+        ' 
         ' ToolStripSeparator1
         ' 
         ToolStripSeparator1.Margin = New Padding(5, 0, 5, 0)
@@ -171,17 +186,6 @@ Partial Class frmMain
         cboOutput.Name = "cboOutput"
         cboOutput.Size = New Size(121, 39)
         cboOutput.ToolTipText = "Output Options"
-        ' 
-        ' btnIncludeMetaFiles
-        ' 
-        btnIncludeMetaFiles.CheckOnClick = True
-        btnIncludeMetaFiles.DisplayStyle = ToolStripItemDisplayStyle.Image
-        btnIncludeMetaFiles.Image = CType(resources.GetObject("btnIncludeMetaFiles.Image"), Image)
-        btnIncludeMetaFiles.ImageTransparentColor = Color.Magenta
-        btnIncludeMetaFiles.Name = "btnIncludeMetaFiles"
-        btnIncludeMetaFiles.Size = New Size(36, 36)
-        btnIncludeMetaFiles.Text = "Include META"
-        btnIncludeMetaFiles.ToolTipText = "Include META files"
         ' 
         ' btnExport
         ' 
@@ -243,6 +247,9 @@ Partial Class frmMain
         ' panSearch
         ' 
         panSearch.BackColor = SystemColors.ControlDark
+        panSearch.Controls.Add(btnCollapseAll)
+        panSearch.Controls.Add(btxExpandAll)
+        panSearch.Controls.Add(btnClearText)
         panSearch.Controls.Add(btnSearch)
         panSearch.Controls.Add(txtSearch)
         panSearch.Dock = DockStyle.Top
@@ -250,6 +257,42 @@ Partial Class frmMain
         panSearch.Name = "panSearch"
         panSearch.Size = New Size(658, 35)
         panSearch.TabIndex = 2
+        ' 
+        ' btnCollapseAll
+        ' 
+        btnCollapseAll.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnCollapseAll.FlatStyle = FlatStyle.Popup
+        btnCollapseAll.Image = CType(resources.GetObject("btnCollapseAll.Image"), Image)
+        btnCollapseAll.Location = New Point(39, 2)
+        btnCollapseAll.Name = "btnCollapseAll"
+        btnCollapseAll.Size = New Size(30, 30)
+        btnCollapseAll.TabIndex = 6
+        ToolTip1.SetToolTip(btnCollapseAll, "Collapse all nodes")
+        btnCollapseAll.UseVisualStyleBackColor = True
+        ' 
+        ' btxExpandAll
+        ' 
+        btxExpandAll.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btxExpandAll.FlatStyle = FlatStyle.Popup
+        btxExpandAll.Image = CType(resources.GetObject("btxExpandAll.Image"), Image)
+        btxExpandAll.Location = New Point(3, 2)
+        btxExpandAll.Name = "btxExpandAll"
+        btxExpandAll.Size = New Size(30, 30)
+        btxExpandAll.TabIndex = 5
+        ToolTip1.SetToolTip(btxExpandAll, "Expand all nodes")
+        btxExpandAll.UseVisualStyleBackColor = True
+        ' 
+        ' btnClearText
+        ' 
+        btnClearText.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnClearText.FlatStyle = FlatStyle.Popup
+        btnClearText.Image = CType(resources.GetObject("btnClearText.Image"), Image)
+        btnClearText.Location = New Point(587, 3)
+        btnClearText.Name = "btnClearText"
+        btnClearText.Size = New Size(30, 30)
+        btnClearText.TabIndex = 4
+        ToolTip1.SetToolTip(btnClearText, "Clear search text")
+        btnClearText.UseVisualStyleBackColor = True
         ' 
         ' btnSearch
         ' 
@@ -260,16 +303,18 @@ Partial Class frmMain
         btnSearch.Name = "btnSearch"
         btnSearch.Size = New Size(30, 30)
         btnSearch.TabIndex = 3
+        ToolTip1.SetToolTip(btnSearch, "Find next serach text")
         btnSearch.UseVisualStyleBackColor = True
         ' 
         ' txtSearch
         ' 
         txtSearch.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         txtSearch.Font = New Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
-        txtSearch.Location = New Point(3, 3)
+        txtSearch.Location = New Point(75, 3)
         txtSearch.Name = "txtSearch"
-        txtSearch.Size = New Size(614, 29)
+        txtSearch.Size = New Size(506, 29)
         txtSearch.TabIndex = 0
+        ToolTip1.SetToolTip(txtSearch, "Search text")
         ' 
         ' lvwSelected
         ' 
@@ -328,5 +373,9 @@ Partial Class frmMain
     Friend WithEvents cboOutput As ToolStripComboBox
     Friend WithEvents btnExclude As ToolStripButton
     Friend WithEvents btnIncludeMetaFiles As ToolStripButton
+    Friend WithEvents btnClearText As Button
+    Friend WithEvents btxExpandAll As Button
+    Friend WithEvents btnCollapseAll As Button
+    Friend WithEvents ToolTip1 As ToolTip
 
 End Class
