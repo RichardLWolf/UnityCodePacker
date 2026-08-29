@@ -31,6 +31,7 @@ Public Class frmMain
 
     ' --- state ---
     Private fsUnityRoot As String = String.Empty
+    Private fsWorkbenchRoot As String = String.Empty
     Private fsAssetsRoot As String = String.Empty
     Private fsGameContentRoot As String = String.Empty
     Private fbTreeBusy As Boolean = False
@@ -42,6 +43,11 @@ Public Class frmMain
     '---- excluded folders list
     Private Const ksExcludedFoldersSettingName As String = "ExcludedAssetFoldersJson"
     Private Const ksExcludedFoldersFallbackFileName As String = "ExcludedAssetFolders.json"
+    Private Const ksWorkbenchFolderSettingName As String = "WorkbenchFolder"
+    Private Const ksWorkbenchFolderFallbackFileName As String = "WorkbenchFolder.txt"
+    Private Const ksWorkbenchTreeNodeName As String = "CoW Workbench"
+    Private Const ksWorkbenchClassesFolderName As String = "Classes"
+    Private Const ksWorkbenchFormsFolderName As String = "Forms"
     Private foExcludedFolders As New List(Of String)
 
     '---- included files options
@@ -74,7 +80,9 @@ Public Class frmMain
             ".md",
             ".xml",
             ".yml",
-            ".yaml"
+            ".yaml",
+            ".fbx",
+            ".vb"
         }
 
     ' ---------- Form ----------
@@ -82,8 +90,30 @@ Public Class frmMain
 
         Dim psUnity As String = My.Settings.UnityFolder
         Dim psExport As String = My.Settings.ExportFolder
+        Dim psWorkbench As String = LoadWorkbenchFolderSetting()
 
         foExcludedFolders = LoadExcludedFoldersFromSettings()
+
+        cboOutput.Items.Clear()
+        cboOutput.Items.Add("ZIP only")
+        cboOutput.Items.Add("JSON and ZIP")
+        cboOutput.SelectedIndex = 0
+
+        ConfigureSelectedListView()
+
+        fbIncludeMetaFiles = btnIncludeMetaFiles.Checked
+
+        If String.IsNullOrWhiteSpace(psWorkbench) Then
+            psWorkbench = txtWorkbenchFolder.Text.Trim()
+        End If
+
+        If Not String.IsNullOrWhiteSpace(psWorkbench) Then
+            fsWorkbenchRoot = psWorkbench.Trim()
+            txtWorkbenchFolder.Text = fsWorkbenchRoot
+        Else
+            fsWorkbenchRoot = String.Empty
+            txtWorkbenchFolder.Text = String.Empty
+        End If
 
         If Not String.IsNullOrWhiteSpace(psUnity) AndAlso Directory.Exists(psUnity) Then
 
@@ -107,15 +137,7 @@ Public Class frmMain
             txtExportTo.Text = Path.Combine(psExport, "codepack.zip")
         End If
 
-        cboOutput.Items.Clear()
-        cboOutput.Items.Add("ZIP only")
-        cboOutput.Items.Add("JSON and ZIP")
-        cboOutput.SelectedIndex = 0
-
-        ConfigureSelectedListView()
         SyncSelectedListViewFromTree()
-
-        fbIncludeMetaFiles = btnIncludeMetaFiles.Checked
 
     End Sub
 
@@ -288,6 +310,64 @@ Public Class frmMain
 
     End Function
 
+    Private Function LoadWorkbenchFolderSetting() As String
+
+        Try
+            Dim psStoredFolder As String = GetStringSettingValue(ksWorkbenchFolderSettingName)
+
+            If Not String.IsNullOrWhiteSpace(psStoredFolder) Then
+                Return psStoredFolder.Trim()
+            End If
+
+            Dim psFallbackPath As String = GetWorkbenchFolderFallbackPath()
+
+            If File.Exists(psFallbackPath) Then
+                Return File.ReadAllText(psFallbackPath, Encoding.UTF8).Trim()
+            End If
+
+        Catch
+            ' Treat an unreadable setting as not configured.
+        End Try
+
+        Return String.Empty
+
+    End Function
+
+    Private Sub SaveWorkbenchFolderSetting()
+
+        Dim psFolder As String = fsWorkbenchRoot.Trim()
+
+        If SetStringSettingValue(ksWorkbenchFolderSettingName, psFolder) Then
+            My.Settings.Save()
+            Return
+        End If
+
+        Dim psFallbackPath As String = GetWorkbenchFolderFallbackPath()
+        Dim psFallbackFolder As String = Path.GetDirectoryName(psFallbackPath)
+
+        If Not String.IsNullOrWhiteSpace(psFallbackFolder) Then
+            Directory.CreateDirectory(psFallbackFolder)
+        End If
+
+        File.WriteAllText(psFallbackPath, psFolder, New UTF8Encoding(False))
+
+    End Sub
+
+    Private Function GetWorkbenchFolderFallbackPath() As String
+
+        Dim psCompanyName As String = Application.CompanyName
+        Dim psProductName As String = Application.ProductName
+
+        If String.IsNullOrWhiteSpace(psCompanyName) Then psCompanyName = "CodePacker"
+        If String.IsNullOrWhiteSpace(psProductName) Then psProductName = "CodePacker"
+
+        Return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                            psCompanyName,
+                            psProductName,
+                            ksWorkbenchFolderFallbackFileName)
+
+    End Function
+
     Private Function NormalizeExcludedFolderList(ByVal oFolderList As IEnumerable(Of String)) As List(Of String)
 
         Dim poOut As New List(Of String)()
@@ -386,6 +466,18 @@ Public Class frmMain
 
     End Function
 
+    Private Function IsWorkbenchRootValid(ByVal sRoot As String) As Boolean
+
+        If String.IsNullOrWhiteSpace(sRoot) Then Return False
+        If Not Directory.Exists(sRoot) Then Return False
+
+        Dim psClassesRoot As String = Path.Combine(sRoot, ksWorkbenchClassesFolderName)
+        Dim psFormsRoot As String = Path.Combine(sRoot, ksWorkbenchFormsFolderName)
+
+        Return Directory.Exists(psClassesRoot) AndAlso Directory.Exists(psFormsRoot)
+
+    End Function
+
     Private Sub ClearProjectSelection()
 
         fsUnityRoot = String.Empty
@@ -407,14 +499,14 @@ Public Class frmMain
     ' ---------- Unity folder selection ----------
     Private Sub btnSelectUnity_Click(sender As Object, e As EventArgs) Handles btnSelectUnity.Click
 
-        Dim poDlg As New FolderBrowserDialog()
+        Dim poDlg As New FolderBrowserDialog
         poDlg.Description = "Select Unity project root folder (the folder that contains Assets\ and GameContent\)"
         poDlg.UseDescriptionForTitle = True
 
         If Directory.Exists(fsUnityRoot) Then poDlg.SelectedPath = fsUnityRoot
         If poDlg.ShowDialog(Me) <> DialogResult.OK Then Exit Sub
 
-        fsUnityRoot = poDlg.SelectedPath.Trim()
+        fsUnityRoot = poDlg.SelectedPath.Trim
         SetProjectRoots()
 
         If Not AreProjectRootsValid() Then
@@ -457,6 +549,8 @@ Public Class frmMain
             Dim poAssetsRootNode As TreeNode = CreateFolderNode(fsAssetsRoot)
             Dim poGameContentRootNode As TreeNode = CreateFolderNode(fsGameContentRoot)
 
+            AddWorkbenchNode(poGameContentRootNode)
+
             tvwFiles.Nodes.Add(poAssetsRootNode)
             tvwFiles.Nodes.Add(poGameContentRootNode)
 
@@ -492,6 +586,26 @@ Public Class frmMain
         End Try
 
         SyncSelectedListViewFromTree()
+
+    End Sub
+
+    Private Sub AddWorkbenchNode(ByVal oGameContentRootNode As TreeNode)
+
+        If oGameContentRootNode Is Nothing Then Exit Sub
+        If Not IsWorkbenchRootValid(fsWorkbenchRoot) Then Exit Sub
+
+        Dim psClassesRoot As String = Path.Combine(fsWorkbenchRoot, ksWorkbenchClassesFolderName)
+        Dim psFormsRoot As String = Path.Combine(fsWorkbenchRoot, ksWorkbenchFormsFolderName)
+
+        Dim poWorkbenchNode As New TreeNode(ksWorkbenchTreeNodeName)
+        poWorkbenchNode.Tag = fsWorkbenchRoot
+        poWorkbenchNode.ImageKey = ksIconFolderClosed
+        poWorkbenchNode.SelectedImageKey = ksIconFolderOpen
+
+        poWorkbenchNode.Nodes.Add(CreateFolderNode(psClassesRoot))
+        poWorkbenchNode.Nodes.Add(CreateFolderNode(psFormsRoot))
+
+        oGameContentRootNode.Nodes.Add(poWorkbenchNode)
 
     End Sub
 
@@ -1119,7 +1233,7 @@ Public Class frmMain
                 Dim psText = ReadFilePreserveFormatting(psFile)
 
                 Dim poEntry As New UnityCsFileEntry
-                poEntry.Path = MakeUnityRelativePath(psFile)
+                poEntry.Path = MakeCodepackRelativePath(psFile)
                 poEntry.Sha256 = ComputeSha256Hex(psText)
                 poEntry.Text = psText
 
@@ -1272,28 +1386,69 @@ Public Class frmMain
 
     End Sub
 
-    Private Function MakeUnityRelativePath(sFullPath As String) As String
+    Private Function MakeCodepackRelativePath(sFullPath As String) As String
 
         If String.IsNullOrWhiteSpace(sFullPath) Then
             Throw New ArgumentException("A source file path is required.", NameOf(sFullPath))
         End If
 
         Dim psFull As String = Path.GetFullPath(sFullPath)
-        Dim psUnityRoot As String = Path.GetFullPath(fsUnityRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-        Dim psUnityPrefix As String = psUnityRoot & Path.DirectorySeparatorChar
+        Dim psRelative As String = String.Empty
 
-        If Not psFull.StartsWith(psUnityPrefix, StringComparison.OrdinalIgnoreCase) Then
-            Throw New InvalidOperationException("Selected file is outside the Unity project root: " & psFull)
+        If TryGetPathRelativeToRoot(psFull, fsUnityRoot, psRelative) Then
+
+            If Not psRelative.StartsWith("Assets" & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) AndAlso
+               Not psRelative.StartsWith("GameContent" & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+                Throw New InvalidOperationException("Selected file is outside the supported Assets\ and GameContent\ roots: " & psFull)
+            End If
+
+            Return "..\" & psRelative.Replace("/", "\")
+
         End If
 
-        Dim psRelative As String = psFull.Substring(psUnityPrefix.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        If IsWorkbenchRootValid(fsWorkbenchRoot) AndAlso TryGetPathRelativeToRoot(psFull, fsWorkbenchRoot, psRelative) Then
 
-        If Not psRelative.StartsWith("Assets" & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) AndAlso
-           Not psRelative.StartsWith("GameContent" & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
-            Throw New InvalidOperationException("Selected file is outside the supported Assets\ and GameContent\ roots: " & psFull)
+            If Not psRelative.StartsWith(ksWorkbenchClassesFolderName & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) AndAlso
+               Not psRelative.StartsWith(ksWorkbenchFormsFolderName & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+                Throw New InvalidOperationException("Selected Workbench file is outside the supported Classes\ and Forms\ folders: " & psFull)
+            End If
+
+            Dim psWorkbenchRootName As String = Path.GetFileName(fsWorkbenchRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+
+            If String.IsNullOrWhiteSpace(psWorkbenchRootName) Then
+                psWorkbenchRootName = ksWorkbenchTreeNodeName
+            End If
+
+            Return "..\" & psWorkbenchRootName & "\" & psRelative.Replace("/", "\")
+
         End If
 
-        Return "..\" & psRelative.Replace("/", "\")
+        Throw New InvalidOperationException("Selected file is outside the supported Unity and CoW Workbench roots: " & psFull)
+
+    End Function
+
+    Private Function TryGetPathRelativeToRoot(ByVal sFullPath As String,
+                                              ByVal sRootPath As String,
+                                              ByRef sRelativePath As String) As Boolean
+
+        sRelativePath = String.Empty
+
+        If String.IsNullOrWhiteSpace(sFullPath) OrElse String.IsNullOrWhiteSpace(sRootPath) Then Return False
+
+        Try
+            Dim psFull As String = Path.GetFullPath(sFullPath)
+            Dim psRoot As String = Path.GetFullPath(sRootPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            Dim psRootPrefix As String = psRoot & Path.DirectorySeparatorChar
+
+            If Not psFull.StartsWith(psRootPrefix, StringComparison.OrdinalIgnoreCase) Then Return False
+
+            sRelativePath = psFull.Substring(psRootPrefix.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            Return Not String.IsNullOrWhiteSpace(sRelativePath)
+
+        Catch
+            sRelativePath = String.Empty
+            Return False
+        End Try
 
     End Function
 
@@ -1431,6 +1586,91 @@ Public Class frmMain
         Finally
             tvwFiles.EndUpdate()
         End Try
+
+    End Sub
+
+    Private Sub btnSetWorkbench_Click(sender As Object, e As EventArgs) Handles btnSetWorkbench.Click
+
+        Using poFolderDlg As New FolderBrowserDialog
+
+            poFolderDlg.Description = "Select the CoW Workbench project root (the folder that contains Classes\ and Forms\)."
+            poFolderDlg.ShowNewFolderButton = False
+            poFolderDlg.UseDescriptionForTitle = True
+
+            Dim psCurrentFolder As String = txtWorkbenchFolder.Text.Trim()
+
+            If Directory.Exists(psCurrentFolder) Then
+                poFolderDlg.SelectedPath = psCurrentFolder
+            ElseIf Directory.Exists(fsWorkbenchRoot) Then
+                poFolderDlg.SelectedPath = fsWorkbenchRoot
+            End If
+
+            If poFolderDlg.ShowDialog(Me) <> DialogResult.OK Then Exit Sub
+
+            ApplyWorkbenchRoot(poFolderDlg.SelectedPath, True)
+
+        End Using
+
+    End Sub
+
+    Private Sub txtWorkbenchFolder_Validated(sender As Object, e As EventArgs) Handles txtWorkbenchFolder.Validated
+
+        Dim psRequestedRoot As String = txtWorkbenchFolder.Text.Trim()
+
+        If String.Equals(psRequestedRoot, fsWorkbenchRoot, StringComparison.OrdinalIgnoreCase) Then Exit Sub
+
+        ApplyWorkbenchRoot(psRequestedRoot, True)
+
+    End Sub
+
+    Private Sub ApplyWorkbenchRoot(ByVal sRequestedRoot As String, ByVal bShowValidationMessage As Boolean)
+
+        Dim psRequestedRoot As String = sRequestedRoot.Trim()
+
+        If String.IsNullOrWhiteSpace(psRequestedRoot) Then
+
+            Dim poCheckedFiles As New HashSet(Of String)(GetCheckedFiles(), StringComparer.OrdinalIgnoreCase)
+            Dim poExpandedFolders As HashSet(Of String) = GetExpandedFolderPaths()
+            Dim psSelectedPath As String = GetSelectedNodePath()
+
+            fsWorkbenchRoot = String.Empty
+            txtWorkbenchFolder.Text = String.Empty
+            SaveWorkbenchFolderSetting()
+
+            If AreProjectRootsValid() Then
+                BuildTree(poCheckedFiles, poExpandedFolders, psSelectedPath)
+            End If
+
+            Exit Sub
+
+        End If
+
+        If Not IsWorkbenchRootValid(psRequestedRoot) Then
+
+            If bShowValidationMessage Then
+                MessageBox.Show(Me,
+                                "The CoW Workbench project root must contain both Classes\ and Forms\ folders.",
+                                "Invalid Workbench Folder",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+            End If
+
+            txtWorkbenchFolder.Text = fsWorkbenchRoot
+            Exit Sub
+
+        End If
+
+        Dim poPreservedCheckedFiles As New HashSet(Of String)(GetCheckedFiles(), StringComparer.OrdinalIgnoreCase)
+        Dim poPreservedExpandedFolders As HashSet(Of String) = GetExpandedFolderPaths()
+        Dim psPreservedSelectedPath As String = GetSelectedNodePath()
+
+        fsWorkbenchRoot = Path.GetFullPath(psRequestedRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        txtWorkbenchFolder.Text = fsWorkbenchRoot
+        SaveWorkbenchFolderSetting()
+
+        If AreProjectRootsValid() Then
+            BuildTree(poPreservedCheckedFiles, poPreservedExpandedFolders, psPreservedSelectedPath)
+        End If
 
     End Sub
 End Class

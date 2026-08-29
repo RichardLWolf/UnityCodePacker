@@ -43,6 +43,9 @@ Partial Class frmMain
         imlIcons = New ImageList(components)
         splBase = New SplitContainer()
         panSearch = New Panel()
+        txtWorkbenchFolder = New TextBox()
+        Label1 = New Label()
+        btnSetWorkbench = New Button()
         btnCollapseAll = New Button()
         btxExpandAll = New Button()
         btnClearText = New Button()
@@ -210,10 +213,10 @@ Partial Class frmMain
         tvwFiles.Font = New Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         tvwFiles.ImageIndex = 0
         tvwFiles.ImageList = imlIcons
-        tvwFiles.Location = New Point(0, 35)
+        tvwFiles.Location = New Point(0, 77)
         tvwFiles.Name = "tvwFiles"
         tvwFiles.SelectedImageIndex = 0
-        tvwFiles.Size = New Size(658, 376)
+        tvwFiles.Size = New Size(658, 334)
         tvwFiles.TabIndex = 1
         ' 
         ' imlIcons
@@ -247,6 +250,9 @@ Partial Class frmMain
         ' panSearch
         ' 
         panSearch.BackColor = SystemColors.ControlDark
+        panSearch.Controls.Add(txtWorkbenchFolder)
+        panSearch.Controls.Add(Label1)
+        panSearch.Controls.Add(btnSetWorkbench)
         panSearch.Controls.Add(btnCollapseAll)
         panSearch.Controls.Add(btxExpandAll)
         panSearch.Controls.Add(btnClearText)
@@ -255,15 +261,46 @@ Partial Class frmMain
         panSearch.Dock = DockStyle.Top
         panSearch.Location = New Point(0, 0)
         panSearch.Name = "panSearch"
-        panSearch.Size = New Size(658, 35)
+        panSearch.Size = New Size(658, 77)
         panSearch.TabIndex = 2
+        ' 
+        ' txtWorkbenchFolder
+        ' 
+        txtWorkbenchFolder.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        txtWorkbenchFolder.Font = New Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        txtWorkbenchFolder.Location = New Point(113, 6)
+        txtWorkbenchFolder.Name = "txtWorkbenchFolder"
+        txtWorkbenchFolder.Size = New Size(504, 29)
+        txtWorkbenchFolder.TabIndex = 9
+        txtWorkbenchFolder.Text = "N:\Repository\CoWGameWorkbench"
+        ' 
+        ' Label1
+        ' 
+        Label1.AutoSize = True
+        Label1.Location = New Point(3, 14)
+        Label1.Name = "Label1"
+        Label1.Size = New Size(104, 15)
+        Label1.TabIndex = 8
+        Label1.Text = "Workbnech Folder"
+        ' 
+        ' btnSetWorkbench
+        ' 
+        btnSetWorkbench.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnSetWorkbench.FlatStyle = FlatStyle.Popup
+        btnSetWorkbench.Image = CType(resources.GetObject("btnSetWorkbench.Image"), Image)
+        btnSetWorkbench.Location = New Point(623, 6)
+        btnSetWorkbench.Name = "btnSetWorkbench"
+        btnSetWorkbench.Size = New Size(30, 30)
+        btnSetWorkbench.TabIndex = 7
+        ToolTip1.SetToolTip(btnSetWorkbench, "Set CoW Workbench project folder")
+        btnSetWorkbench.UseVisualStyleBackColor = True
         ' 
         ' btnCollapseAll
         ' 
-        btnCollapseAll.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnCollapseAll.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left
         btnCollapseAll.FlatStyle = FlatStyle.Popup
         btnCollapseAll.Image = CType(resources.GetObject("btnCollapseAll.Image"), Image)
-        btnCollapseAll.Location = New Point(39, 2)
+        btnCollapseAll.Location = New Point(39, 41)
         btnCollapseAll.Name = "btnCollapseAll"
         btnCollapseAll.Size = New Size(30, 30)
         btnCollapseAll.TabIndex = 6
@@ -272,10 +309,10 @@ Partial Class frmMain
         ' 
         ' btxExpandAll
         ' 
-        btxExpandAll.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btxExpandAll.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left
         btxExpandAll.FlatStyle = FlatStyle.Popup
         btxExpandAll.Image = CType(resources.GetObject("btxExpandAll.Image"), Image)
-        btxExpandAll.Location = New Point(3, 2)
+        btxExpandAll.Location = New Point(3, 41)
         btxExpandAll.Name = "btxExpandAll"
         btxExpandAll.Size = New Size(30, 30)
         btxExpandAll.TabIndex = 5
@@ -284,10 +321,10 @@ Partial Class frmMain
         ' 
         ' btnClearText
         ' 
-        btnClearText.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnClearText.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
         btnClearText.FlatStyle = FlatStyle.Popup
         btnClearText.Image = CType(resources.GetObject("btnClearText.Image"), Image)
-        btnClearText.Location = New Point(587, 3)
+        btnClearText.Location = New Point(587, 42)
         btnClearText.Name = "btnClearText"
         btnClearText.Size = New Size(30, 30)
         btnClearText.TabIndex = 4
@@ -296,10 +333,10 @@ Partial Class frmMain
         ' 
         ' btnSearch
         ' 
-        btnSearch.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnSearch.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
         btnSearch.FlatStyle = FlatStyle.Popup
         btnSearch.Image = CType(resources.GetObject("btnSearch.Image"), Image)
-        btnSearch.Location = New Point(623, 2)
+        btnSearch.Location = New Point(623, 41)
         btnSearch.Name = "btnSearch"
         btnSearch.Size = New Size(30, 30)
         btnSearch.TabIndex = 3
@@ -308,9 +345,9 @@ Partial Class frmMain
         ' 
         ' txtSearch
         ' 
-        txtSearch.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        txtSearch.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         txtSearch.Font = New Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
-        txtSearch.Location = New Point(75, 3)
+        txtSearch.Location = New Point(75, 42)
         txtSearch.Name = "txtSearch"
         txtSearch.Size = New Size(506, 29)
         txtSearch.TabIndex = 0
@@ -377,5 +414,8 @@ Partial Class frmMain
     Friend WithEvents btxExpandAll As Button
     Friend WithEvents btnCollapseAll As Button
     Friend WithEvents ToolTip1 As ToolTip
+    Friend WithEvents Label1 As Label
+    Friend WithEvents btnSetWorkbench As Button
+    Friend WithEvents txtWorkbenchFolder As TextBox
 
 End Class
